@@ -76,7 +76,8 @@ export default function Home() {
           <a href="#method">会诊方法</a>
           <a href="#process">咨询流程</a>
           <a href="#services">服务方式</a>
-          <a className="nav-cta" href="#prepare">开始准备</a>
+          <a href="/pilot">封闭内测</a>
+          <a className="nav-cta" href="#prepare">咨询准备</a>
         </nav>
       </header>
 
@@ -92,7 +93,7 @@ export default function Home() {
             以结构、环境、气机、事件四条轴线，建立一份可核验、可修正、持续理解你的人生命理档案。
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#prepare">准备一次咨询 <span>→</span></a>
+            <a className="button button-primary" href="/pilot">申请封闭内测 <span>→</span></a>
             <a className="text-link" href="#process">先看我们怎么判断 <span>↘</span></a>
           </div>
           <ul className="trust-list" aria-label="服务原则">

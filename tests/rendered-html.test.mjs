@@ -4,13 +4,13 @@ import test from "node:test";
 
 const templateRoot = new URL("../", import.meta.url);
 
-async function render() {
+async function render(pathname = "/") {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request("http://localhost/", {
+    new Request(`http://localhost${pathname}`, {
       headers: { accept: "text/html", host: "localhost" },
     }),
     {
@@ -35,6 +35,21 @@ test("server-renders the finished consultation site", async () => {
   assert.match(html, /隐私默认不留存/);
   assert.match(html, /http:\/\/localhost\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+});
+
+test("server-renders the closed pilot intake route", async () => {
+  const response = await render("/pilot");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /首批封闭内测｜四派人生档案会诊/);
+  assert.match(html, /先交出生资料，锁定后再交事实/);
+  assert.match(html, /第一阶段/);
+  assert.match(html, /第二阶段/);
+  assert.match(html, /本页没有提交接口/);
+  assert.match(html, /匿名内部研究（可选）/);
+  assert.doesNotMatch(html, /真实姓名|手机号码|微信号/);
 });
 
 test("removes starter preview code and dependency", async () => {
