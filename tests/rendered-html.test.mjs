@@ -4,7 +4,9 @@ import test from "node:test";
 
 const templateRoot = new URL("../", import.meta.url);
 
-async function render(pathname = "/") {
+const pilotInviteCode = "JUNJUN-TEST-ACCESS";
+
+async function render(pathname = "/", init = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -12,9 +14,11 @@ async function render(pathname = "/") {
   return worker.fetch(
     new Request(`http://localhost${pathname}`, {
       headers: { accept: "text/html", host: "localhost" },
+      ...init,
     }),
     {
       ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      PILOT_INVITE_CODE: pilotInviteCode,
     },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -37,10 +41,59 @@ test("server-renders the finished consultation site", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
-test("server-renders the closed pilot intake route", async () => {
+test("pilot route shows the invite gate without an access cookie", async () => {
   const response = await render("/pilot");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /请输入邀请人/);
+  assert.match(html, /name="inviteCode"/);
+  assert.doesNotMatch(html, /先交出生资料，锁定后再交事实/);
+});
+
+test("pilot route rejects an incorrect invite code", async () => {
+  const response = await render("/pilot", {
+    method: "POST",
+    headers: {
+      accept: "text/html",
+      "content-type": "application/x-www-form-urlencoded",
+      host: "localhost",
+    },
+    body: new URLSearchParams({ inviteCode: "WRONG-CODE" }),
+  });
+  assert.equal(response.status, 401);
+  assert.match(await response.text(), /邀请码不正确/);
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
+test("pilot route accepts the invite code and server-renders the intake", async () => {
+  const unlockResponse = await render("/pilot", {
+    method: "POST",
+    headers: {
+      accept: "text/html",
+      "content-type": "application/x-www-form-urlencoded",
+      host: "localhost",
+    },
+    body: new URLSearchParams({ inviteCode: pilotInviteCode }),
+  });
+  assert.equal(unlockResponse.status, 303);
+  assert.equal(unlockResponse.headers.get("location"), "/pilot");
+  const cookie = unlockResponse.headers.get("set-cookie");
+  assert.match(cookie ?? "", /^pilot_access=[a-f0-9]{64};/);
+  assert.match(cookie ?? "", /HttpOnly/);
+  assert.match(cookie ?? "", /SameSite=Lax/);
+
+  const response = await render("/pilot", {
+    headers: {
+      accept: "text/html",
+      cookie: cookie?.split(";")[0] ?? "",
+      host: "localhost",
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
 
   const html = await response.text();
   assert.match(html, /首批封闭内测｜四派人生档案会诊/);
