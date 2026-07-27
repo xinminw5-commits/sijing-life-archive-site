@@ -200,23 +200,23 @@ function inviteGateResponse(options: {
   <style>
     :root{color-scheme:light;--paper:#f4f0e7;--ink:#17201e;--muted:#53605c;--teal:#183f3a;--red:#a84935;--line:rgba(23,32,30,.16)}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 14% 12%,rgba(168,73,53,.09),transparent 28%),var(--paper);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif}
-    main{width:min(100%,520px);padding:clamp(30px,7vw,54px);border:1px solid var(--line);background:rgba(255,255,255,.46);box-shadow:0 28px 80px rgba(23,32,30,.11)}
-    .brand{display:flex;align-items:center;gap:12px;margin-bottom:48px}
-    .seal{width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--red);color:var(--red);font:20px "Songti SC","STSong",serif}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 14% 12%,rgba(168,73,53,.09),transparent 28%),var(--paper);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+    main{width:min(100%,480px);padding:clamp(28px,6vw,44px);border:1px solid var(--line);background:rgba(255,255,255,.46);box-shadow:0 24px 68px rgba(23,32,30,.1)}
+    .brand{display:flex;align-items:center;gap:11px;margin-bottom:36px}
+    .seal{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--red);color:var(--red);font:18px "Songti SC","STSong",serif}
     .brand span:last-child{display:grid;gap:3px}
-    .brand strong{font:600 16px "Songti SC","STSong",serif;letter-spacing:.14em}
+    .brand strong{font:600 15px "Songti SC","STSong",serif;letter-spacing:.12em}
     .brand small,.eyebrow{color:var(--muted);font-size:9px;letter-spacing:.18em}
     .eyebrow{margin:0 0 16px;color:var(--red)}
-    h1{margin:0;font:500 clamp(34px,8vw,50px)/1.22 "Songti SC","STSong",serif;letter-spacing:-.035em}
-    .intro{margin:20px 0 30px;color:var(--muted);font-size:14px;line-height:1.85}
+    h1{margin:0;font:500 clamp(28px,6vw,40px)/1.32 "Songti SC","STSong",serif;letter-spacing:-.01em}
+    .intro{margin:18px 0 24px;color:var(--muted);font-size:13px;line-height:1.7}
     label{display:grid;gap:9px;font-size:12px;font-weight:600}
-    input{width:100%;height:52px;padding:0 15px;border:1px solid var(--line);border-radius:0;background:#fffdf8;color:var(--ink);font:15px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;outline:none}
+    input{width:100%;height:48px;padding:0 14px;border:1px solid var(--line);border-radius:0;background:#fffdf8;color:var(--ink);font:14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;outline:none}
     input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(24,63,58,.1)}
-    button{width:100%;height:52px;margin-top:14px;border:0;background:var(--teal);color:#fff;font:600 14px inherit;cursor:pointer}
+    button{width:100%;height:48px;margin-top:13px;border:0;background:var(--teal);color:#fff;font:600 13px inherit;cursor:pointer}
     button:hover{background:#2c5b53}
     .message{margin:0 0 18px;padding:12px 14px;border-left:3px solid var(--red);background:rgba(168,73,53,.08);color:#7b3023;font-size:12px;line-height:1.6}
-    .note{margin:20px 0 0;color:var(--muted);font-size:11px;line-height:1.7}
+    .note{margin:18px 0 0;color:var(--muted);font-size:10px;line-height:1.7}
     a{color:var(--teal)}
   </style>
 </head>

@@ -49,7 +49,7 @@ test("pilot route shows the invite gate without an access cookie", async () => {
   const html = await response.text();
   assert.match(html, /请输入邀请人/);
   assert.match(html, /name="inviteCode"/);
-  assert.doesNotMatch(html, /先交出生资料，锁定后再交事实/);
+  assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/);
 });
 
 test("pilot route rejects an incorrect invite code", async () => {
@@ -97,23 +97,28 @@ test("pilot route accepts the invite code and server-renders the intake", async 
 
   const html = await response.text();
   assert.match(html, /首批封闭内测｜四派人生档案会诊/);
-  assert.match(html, /先交出生资料，锁定后再交事实/);
+  assert.match(html, /先生成资料包，再由均均完成人工初判/);
+  assert.match(html, /如何获得初步判断/);
+  assert.match(html, /本页不会自动提交，也不会自动分析/);
   assert.match(html, /第一阶段/);
-  assert.match(html, /第二阶段/);
+  assert.match(html, /收到初步判断后/);
   assert.match(html, /本页没有提交接口/);
   assert.match(html, /匿名内部研究（可选）/);
   assert.doesNotMatch(html, /真实姓名|手机号码|微信号/);
 });
 
 test("removes starter preview code and dependency", async () => {
-  const [page, layout, packageJson] = await Promise.all([
+  const [page, layout, pilotIntake, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/pilot/PilotIntake.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /ConsultationStarter/);
   assert.match(layout, /generateMetadata/);
+  assert.match(pilotIntake, /客观事实锚点暂未开放/);
+  assert.match(pilotIntake, /页面本身不会自动出现反馈/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("../package-lock.json", templateRoot)));

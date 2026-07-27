@@ -216,11 +216,24 @@ export function PilotIntake() {
       <div className="pilot-workbench-head">
         <div>
           <p className="eyebrow"><span /> 两阶段资料台</p>
-          <h2 id="pilot-form-title">先交出生资料，锁定后再交事实。</h2>
+          <h2 id="pilot-form-title">先生成资料包，再由均均完成人工初判。</h2>
         </div>
         <button className="pilot-clear" type="button" onClick={clearAll}>
           清空本页资料
         </button>
+      </div>
+
+      <div className="pilot-handoff" aria-label="获得初步判断的四个步骤">
+        <div className="pilot-handoff-head">
+          <span>如何获得初步判断</span>
+          <p><b>本页不会自动提交，也不会自动分析。</b>填写完成只是把资料整理成一份可复制的文字包。</p>
+        </div>
+        <ol>
+          <li><span>01</span><b>填写出生资料</b><small>第一阶段不填写人生经历。</small></li>
+          <li><span>02</span><b>生成并复制</b><small>点击生成后，复制完整资料包。</small></li>
+          <li><span>03</span><b>私下发给均均</b><small>通过微信或双方约定的私密渠道发送。</small></li>
+          <li><span>04</span><b>收到人工初判</b><small>均均会同时给出第二阶段锁定凭证。</small></li>
+        </ol>
       </div>
 
       <div className="pilot-stage-tabs" role="tablist" aria-label="内测资料阶段">
@@ -242,7 +255,7 @@ export function PilotIntake() {
           onClick={() => setStage("facts")}
         >
           <span>第二阶段</span>
-          锁定后事实
+          收到初步判断后
         </button>
       </div>
 
@@ -464,11 +477,15 @@ export function PilotIntake() {
             <div className="pilot-packet">
               <div>
                 <span>第一阶段资料包已生成</span>
-                <small>核对后主动复制；网站没有收到这些资料。</small>
+                <small>资料目前仍只在你的浏览器里，网站没有收到。</small>
               </div>
               <textarea readOnly value={birthPacket} rows={18} aria-label="第一阶段资料包" />
+              <div className="pilot-next-action">
+                <b>现在还差一步：把资料包发给均均</b>
+                <p>先点击复制，再通过微信或双方约定的私密渠道发送。发送后由均均人工排盘并回复初步判断；页面本身不会自动出现反馈。</p>
+              </div>
               <button type="button" onClick={() => copyPacket(birthPacket, "birth")}>
-                {copied === "birth" ? "已复制 ✓" : "复制第一阶段资料包"}
+                {copied === "birth" ? "已复制，请私下发给均均 ✓" : "复制资料包，下一步发给均均"}
               </button>
             </div>
           )}
@@ -476,8 +493,11 @@ export function PilotIntake() {
       ) : (
         <div className="pilot-panel" role="tabpanel">
           <div className="pilot-lock-banner">
-            <span>先检查锁定</span>
-            <p>如果你还没有收到案例编号、盲断锁定编号和锁定时间，请停止填写事实，先联系分析者。</p>
+            <div>
+              <span>第二阶段尚未开始</span>
+              <p>案例编号、盲断锁定编号和锁定时间都由均均在完成初步判断后提供。没有收到这三项，不需要在本页继续填写。</p>
+            </div>
+            <button type="button" onClick={() => setStage("birth")}>返回第一阶段</button>
           </div>
           <div className="pilot-panel-intro">
             <span className="pilot-index">A</span>
@@ -521,10 +541,17 @@ export function PilotIntake() {
             <span>我确认：上述锁定信息在我填写下面的人生事实之前已经由分析者提供。</span>
           </label>
 
+          {!lockReady && (
+            <div className="pilot-anchors-locked" role="status">
+              <b>客观事实锚点暂未开放</b>
+              <p>先把第一阶段资料包发给均均。收到人工初判和三项锁定凭证后，填写上方凭证并确认，这里的输入框才会开放。</p>
+            </div>
+          )}
+
           <fieldset className="pilot-anchors" disabled={!lockReady}>
             <legend>
               <span className="pilot-index">B</span>
-              <span><b>客观事实锚点</b><small>至少三条；没有明显变化也可以如实填写。</small></span>
+              <span><b>客观事实锚点（第二阶段）</b><small>至少三条；没有明显变化也可以如实填写。</small></span>
             </legend>
             {anchors.map((anchor, index) => (
               <article key={index}>
@@ -672,4 +699,3 @@ export function PilotIntake() {
     </section>
   );
 }
-
