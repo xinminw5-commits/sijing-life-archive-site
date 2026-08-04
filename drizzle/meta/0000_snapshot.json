@@ -1,0 +1,1483 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "da6aa4a9-3e15-4208-ac98-eeeb7a6e4843",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "default_storage_mode": {
+          "name": "default_storage_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'session_only'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "accounts_status_idx": {
+          "name": "accounts_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "accounts_role_check": {
+          "name": "accounts_role_check",
+          "value": "\"accounts\".\"role\" in ('user','admin','researcher')"
+        },
+        "accounts_status_check": {
+          "name": "accounts_status_check",
+          "value": "\"accounts\".\"status\" in ('active','deletion_pending','deleted')"
+        },
+        "accounts_storage_mode_check": {
+          "name": "accounts_storage_mode_check",
+          "value": "\"accounts\".\"default_storage_mode\" in ('session_only','personal_archive','personal_archive_research')"
+        },
+        "accounts_deleted_timestamp_check": {
+          "name": "accounts_deleted_timestamp_check",
+          "value": "\"accounts\".\"status\" != 'deleted' or \"accounts\".\"deleted_at\" is not null"
+        }
+      }
+    },
+    "archive_records": {
+      "name": "archive_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "record_type": {
+          "name": "record_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sensitivity": {
+          "name": "sensitivity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_ciphertext": {
+          "name": "payload_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_nonce": {
+          "name": "payload_nonce",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_auth_tag": {
+          "name": "payload_auth_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_digest": {
+          "name": "payload_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "supersedes_record_id": {
+          "name": "supersedes_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tombstoned_at": {
+          "name": "tombstoned_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "archive_records_archive_created_idx": {
+          "name": "archive_records_archive_created_idx",
+          "columns": [
+            "archive_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "archive_records_owner_type_idx": {
+          "name": "archive_records_owner_type_idx",
+          "columns": [
+            "owner_account_id",
+            "record_type"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "archive_records_supersedes_record_id_archive_records_id_fk": {
+          "name": "archive_records_supersedes_record_id_archive_records_id_fk",
+          "tableFrom": "archive_records",
+          "tableTo": "archive_records",
+          "columnsFrom": [
+            "supersedes_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "archive_records_owner_archive_fk": {
+          "name": "archive_records_owner_archive_fk",
+          "tableFrom": "archive_records",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "archive_records_sensitivity_check": {
+          "name": "archive_records_sensitivity_check",
+          "value": "\"archive_records\".\"sensitivity\" in ('ordinary','sensitive','highly_sensitive')"
+        },
+        "archive_records_type_check": {
+          "name": "archive_records_type_check",
+          "value": "\"archive_records\".\"record_type\" in ('chart','workflow_snapshot','candidate_verification','blind_reading','life_event','verification','consultation')"
+        }
+      }
+    },
+    "audit_events": {
+      "name": "audit_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_account_id": {
+          "name": "actor_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_digest": {
+          "name": "actor_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_role": {
+          "name": "actor_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_digest": {
+          "name": "target_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason_code": {
+          "name": "reason_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ticket_id": {
+          "name": "ticket_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purge_at": {
+          "name": "purge_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "audit_events_actor_idx": {
+          "name": "audit_events_actor_idx",
+          "columns": [
+            "actor_account_id",
+            "occurred_at"
+          ],
+          "isUnique": false
+        },
+        "audit_events_target_idx": {
+          "name": "audit_events_target_idx",
+          "columns": [
+            "target_type",
+            "target_id"
+          ],
+          "isUnique": false
+        },
+        "audit_events_purge_idx": {
+          "name": "audit_events_purge_idx",
+          "columns": [
+            "purge_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "audit_events_actor_account_id_accounts_id_fk": {
+          "name": "audit_events_actor_account_id_accounts_id_fk",
+          "tableFrom": "audit_events",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "actor_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "audit_events_actor_role_check": {
+          "name": "audit_events_actor_role_check",
+          "value": "\"audit_events\".\"actor_role\" in ('user','admin','researcher','system')"
+        },
+        "audit_events_outcome_check": {
+          "name": "audit_events_outcome_check",
+          "value": "\"audit_events\".\"outcome\" in ('success','denied')"
+        },
+        "audit_events_target_reference_check": {
+          "name": "audit_events_target_reference_check",
+          "value": "\"audit_events\".\"target_id\" is not null or \"audit_events\".\"target_digest\" is not null or \"audit_events\".\"target_type\" in ('audit_log','retention_run')"
+        },
+        "audit_events_privileged_context_check": {
+          "name": "audit_events_privileged_context_check",
+          "value": "(\"audit_events\".\"actor_role\" != 'admin' or (\"audit_events\".\"reason_code\" is not null and \"audit_events\".\"ticket_id\" is not null)) and (\"audit_events\".\"actor_role\" != 'researcher' or \"audit_events\".\"ticket_id\" is not null)"
+        }
+      }
+    },
+    "auth_sessions": {
+      "name": "auth_sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_digest": {
+          "name": "token_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_sessions_token_digest_uq": {
+          "name": "auth_sessions_token_digest_uq",
+          "columns": [
+            "token_digest"
+          ],
+          "isUnique": true
+        },
+        "auth_sessions_account_idx": {
+          "name": "auth_sessions_account_idx",
+          "columns": [
+            "account_id"
+          ],
+          "isUnique": false
+        },
+        "auth_sessions_expiry_idx": {
+          "name": "auth_sessions_expiry_idx",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auth_sessions_account_id_accounts_id_fk": {
+          "name": "auth_sessions_account_id_accounts_id_fk",
+          "tableFrom": "auth_sessions",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "consent_decisions": {
+      "name": "consent_decisions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_version": {
+          "name": "policy_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "scope_json": {
+          "name": "scope_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "consent_decisions_archive_purpose_time_uq": {
+          "name": "consent_decisions_archive_purpose_time_uq",
+          "columns": [
+            "archive_id",
+            "purpose",
+            "occurred_at"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "consent_decisions_owner_archive_fk": {
+          "name": "consent_decisions_owner_archive_fk",
+          "tableFrom": "consent_decisions",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "consent_decisions_purpose_check": {
+          "name": "consent_decisions_purpose_check",
+          "value": "\"consent_decisions\".\"purpose\" in ('service_processing','anonymous_research','public_display')"
+        },
+        "consent_decisions_action_check": {
+          "name": "consent_decisions_action_check",
+          "value": "\"consent_decisions\".\"action\" in ('grant','withdraw')"
+        }
+      }
+    },
+    "deletion_jobs": {
+      "name": "deletion_jobs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requester_account_id": {
+          "name": "requester_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_archive_id": {
+          "name": "target_archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_digest": {
+          "name": "target_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "backup_purge_due_at": {
+          "name": "backup_purge_due_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "deletion_jobs_target_digest_idx": {
+          "name": "deletion_jobs_target_digest_idx",
+          "columns": [
+            "target_digest"
+          ],
+          "isUnique": false
+        },
+        "deletion_jobs_status_idx": {
+          "name": "deletion_jobs_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "deletion_jobs_requester_account_id_accounts_id_fk": {
+          "name": "deletion_jobs_requester_account_id_accounts_id_fk",
+          "tableFrom": "deletion_jobs",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "requester_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "deletion_jobs_target_archive_id_user_archives_id_fk": {
+          "name": "deletion_jobs_target_archive_id_user_archives_id_fk",
+          "tableFrom": "deletion_jobs",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "target_archive_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "deletion_jobs_target_type_check": {
+          "name": "deletion_jobs_target_type_check",
+          "value": "\"deletion_jobs\".\"target_type\" in ('archive','account')"
+        },
+        "deletion_jobs_status_check": {
+          "name": "deletion_jobs_status_check",
+          "value": "\"deletion_jobs\".\"status\" in ('pending','completed','failed')"
+        }
+      }
+    },
+    "derived_indexes": {
+      "name": "derived_indexes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "index_type": {
+          "name": "index_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_digest": {
+          "name": "token_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "derived_indexes_archive_idx": {
+          "name": "derived_indexes_archive_idx",
+          "columns": [
+            "archive_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "derived_indexes_owner_archive_fk": {
+          "name": "derived_indexes_owner_archive_fk",
+          "tableFrom": "derived_indexes",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "export_jobs": {
+      "name": "export_jobs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ready'"
+        },
+        "object_key_digest": {
+          "name": "object_key_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "export_jobs_expiry_idx": {
+          "name": "export_jobs_expiry_idx",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "export_jobs_owner_archive_fk": {
+          "name": "export_jobs_owner_archive_fk",
+          "tableFrom": "export_jobs",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "export_jobs_status_check": {
+          "name": "export_jobs_status_check",
+          "value": "\"export_jobs\".\"status\" = 'ready'"
+        }
+      }
+    },
+    "external_identities": {
+      "name": "external_identities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issuer": {
+          "name": "issuer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject_digest": {
+          "name": "subject_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "linked_at": {
+          "name": "linked_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "external_identities_issuer_subject_uq": {
+          "name": "external_identities_issuer_subject_uq",
+          "columns": [
+            "issuer",
+            "subject_digest"
+          ],
+          "isUnique": true
+        },
+        "external_identities_account_idx": {
+          "name": "external_identities_account_idx",
+          "columns": [
+            "account_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "external_identities_account_id_accounts_id_fk": {
+          "name": "external_identities_account_id_accounts_id_fk",
+          "tableFrom": "external_identities",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "public_cases": {
+      "name": "public_cases",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consent_decision_id": {
+          "name": "consent_decision_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "redaction_version": {
+          "name": "redaction_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reviewer_id": {
+          "name": "reviewer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_ciphertext": {
+          "name": "payload_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_nonce": {
+          "name": "payload_nonce",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_auth_tag": {
+          "name": "payload_auth_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "public_cases_status_idx": {
+          "name": "public_cases_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "public_cases_archive_id_user_archives_id_fk": {
+          "name": "public_cases_archive_id_user_archives_id_fk",
+          "tableFrom": "public_cases",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "archive_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "public_cases_consent_decision_id_consent_decisions_id_fk": {
+          "name": "public_cases_consent_decision_id_consent_decisions_id_fk",
+          "tableFrom": "public_cases",
+          "tableTo": "consent_decisions",
+          "columnsFrom": [
+            "consent_decision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "public_cases_owner_archive_fk": {
+          "name": "public_cases_owner_archive_fk",
+          "tableFrom": "public_cases",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "public_cases_status_check": {
+          "name": "public_cases_status_check",
+          "value": "\"public_cases\".\"status\" in ('draft','published')"
+        },
+        "public_cases_published_timestamp_check": {
+          "name": "public_cases_published_timestamp_check",
+          "value": "\"public_cases\".\"status\" != 'published' or \"public_cases\".\"published_at\" is not null"
+        }
+      }
+    },
+    "research_records": {
+      "name": "research_records",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "archive_id": {
+          "name": "archive_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consent_decision_id": {
+          "name": "consent_decision_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject_digest": {
+          "name": "subject_digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_ciphertext": {
+          "name": "payload_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_nonce": {
+          "name": "payload_nonce",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_auth_tag": {
+          "name": "payload_auth_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "research_records_study_expiry_idx": {
+          "name": "research_records_study_expiry_idx",
+          "columns": [
+            "study_id",
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "research_records_archive_idx": {
+          "name": "research_records_archive_idx",
+          "columns": [
+            "archive_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "research_records_archive_id_user_archives_id_fk": {
+          "name": "research_records_archive_id_user_archives_id_fk",
+          "tableFrom": "research_records",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "archive_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "research_records_consent_decision_id_consent_decisions_id_fk": {
+          "name": "research_records_consent_decision_id_consent_decisions_id_fk",
+          "tableFrom": "research_records",
+          "tableTo": "consent_decisions",
+          "columnsFrom": [
+            "consent_decision_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "research_records_owner_archive_fk": {
+          "name": "research_records_owner_archive_fk",
+          "tableFrom": "research_records",
+          "tableTo": "user_archives",
+          "columnsFrom": [
+            "owner_account_id",
+            "archive_id"
+          ],
+          "columnsTo": [
+            "owner_account_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "research_study_assignments": {
+      "name": "research_study_assignments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "assigned_at": {
+          "name": "assigned_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "research_study_assignments_account_study_uq": {
+          "name": "research_study_assignments_account_study_uq",
+          "columns": [
+            "account_id",
+            "study_id"
+          ],
+          "isUnique": true
+        },
+        "research_study_assignments_study_idx": {
+          "name": "research_study_assignments_study_idx",
+          "columns": [
+            "study_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "research_study_assignments_account_id_accounts_id_fk": {
+          "name": "research_study_assignments_account_id_accounts_id_fk",
+          "tableFrom": "research_study_assignments",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "user_archives": {
+      "name": "user_archives",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_account_id": {
+          "name": "owner_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storage_mode": {
+          "name": "storage_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "data_key_ref": {
+          "name": "data_key_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retention_notice_at": {
+          "name": "retention_notice_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retention_delete_at": {
+          "name": "retention_delete_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "user_archives_owner_id_uq": {
+          "name": "user_archives_owner_id_uq",
+          "columns": [
+            "owner_account_id",
+            "id"
+          ],
+          "isUnique": true
+        },
+        "user_archives_owner_idx": {
+          "name": "user_archives_owner_idx",
+          "columns": [
+            "owner_account_id"
+          ],
+          "isUnique": false
+        },
+        "user_archives_retention_idx": {
+          "name": "user_archives_retention_idx",
+          "columns": [
+            "retention_delete_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "user_archives_owner_account_id_accounts_id_fk": {
+          "name": "user_archives_owner_account_id_accounts_id_fk",
+          "tableFrom": "user_archives",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "owner_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "user_archives_storage_mode_check": {
+          "name": "user_archives_storage_mode_check",
+          "value": "\"user_archives\".\"storage_mode\" in ('personal_archive','personal_archive_research')"
+        },
+        "user_archives_status_check": {
+          "name": "user_archives_status_check",
+          "value": "\"user_archives\".\"status\" in ('active','processing_suspended','deletion_pending')"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
