@@ -14,6 +14,7 @@
 - 页面不向服务器提交或保存填写内容；参与者主动复制资料包，通过约定的私密渠道传递。
 - 服务、匿名研究和公开展示分别授权。
 - 确定性排盘 v0 已在 `domain/chart` 中实现，但尚未接入页面或真实个案；当前仍没有账号、真实数据持久化、支付和线上 AI 会诊。
+- `domain/workflow` 已实现 `chart-case-workflow.v0.1` 纯函数状态机；它强制 Chart 准入、盲断隔离与锁定、追加版本、核验和前瞻资格，但尚未接 API、数据库和页面。
 
 ## 本地验证
 
@@ -22,8 +23,8 @@
 ```bash
 pnpm dev
 pnpm test
-pnpm run typecheck:chart
-pnpm run lint:chart
+pnpm run typecheck:domain
+pnpm run lint:domain
 ```
 
 Sites 项目标识保存在 `.openai/hosting.json`。真实命例、精确出生资料、联系方式和私人经历不得写入本仓库。
