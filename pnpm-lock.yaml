@@ -20,6 +20,9 @@ importers:
       react-dom:
         specifier: 19.2.6
         version: 19.2.6(react@19.2.6)
+      tyme4ts:
+        specifier: 1.5.2
+        version: 1.5.2
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: 1.37.1
@@ -3303,6 +3306,9 @@ packages:
   turbo-stream@3.2.0:
     resolution: {integrity: sha512-EK+bZ9UVrVh7JLslVFOV0GEMsociOqVOvEMTAd4ixMyffN5YNIEdLZWXUx5PJqDbTxSIBWw04HS9gCY4frYQDQ==}
 
+  tyme4ts@1.5.2:
+    resolution: {integrity: sha512-vVAjUv1ieXleS7hCOgjAoHaZ0BdNJIza0uDOhXNpndegqWQh9ytKMR0fjkG869yqLtpXAHnzNSouBg28nrIaAg==}
+
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -6525,6 +6531,8 @@ snapshots:
       fsevents: 2.3.3
 
   turbo-stream@3.2.0: {}
+
+  tyme4ts@1.5.2: {}
 
   type-check@0.4.0:
     dependencies:
