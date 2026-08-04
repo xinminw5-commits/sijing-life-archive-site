@@ -55,6 +55,26 @@ const ADMIN: AdminPrincipal = {
   reasonCode: "user_support",
   ticketId: "TICKET-001",
 };
+const ADMIN_EXPORT: AdminPrincipal = {
+  ...ADMIN,
+  requestId: "REQ-ADMIN-EXPORT",
+  reasonCode: "user_export_request",
+};
+const ADMIN_DELETE: AdminPrincipal = {
+  ...ADMIN,
+  requestId: "REQ-ADMIN-DELETE",
+  reasonCode: "user_deletion_request",
+};
+const ADMIN_AUDIT: AdminPrincipal = {
+  ...ADMIN,
+  requestId: "REQ-ADMIN-AUDIT",
+  reasonCode: "security_investigation",
+};
+const ADMIN_PUBLIC: AdminPrincipal = {
+  ...ADMIN,
+  requestId: "REQ-ADMIN-PUBLIC",
+  reasonCode: "public_case_review",
+};
 const RESEARCHER: ResearchPrincipal = {
   role: "researcher",
   accountId: "ACCOUNT-RESEARCHER",
@@ -68,25 +88,25 @@ function digestIdentifier(value: string): string {
 
 function setupStore(): InMemoryPrivacyStore {
   const store = new InMemoryPrivacyStore({ digestIdentifier });
-  store.createAccount({
+  store.createAccount(SYS_IDENTITY, {
     accountId: USER_A.accountId,
     role: "user",
     defaultStorageMode: "personal_archive",
     createdAt: T.created,
   });
-  store.createAccount({
+  store.createAccount(SYS_IDENTITY, {
     accountId: USER_B.accountId,
     role: "user",
     defaultStorageMode: "session_only",
     createdAt: T.created,
   });
-  store.createAccount({
+  store.createAccount(SYS_IDENTITY, {
     accountId: ADMIN.accountId,
     role: "admin",
     defaultStorageMode: "session_only",
     createdAt: T.created,
   });
-  store.createAccount({
+  store.createAccount(SYS_IDENTITY, {
     accountId: RESEARCHER.accountId,
     role: "researcher",
     defaultStorageMode: "session_only",
@@ -133,6 +153,30 @@ function appendSecret(
     createdAt,
   });
 }
+
+test("账户只能由 identity provisioning 系统上下文创建", () => {
+  const store = new InMemoryPrivacyStore({ digestIdentifier });
+  assert.throws(
+    () =>
+      store.createAccount(SYS_RETENTION, {
+        accountId: "FORGED-ADMIN",
+        role: "admin",
+        defaultStorageMode: "session_only",
+        createdAt: T.created,
+      }),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "ADMIN_CONTEXT_REQUIRED",
+  );
+  assert.equal(
+    store.createAccount(SYS_IDENTITY, {
+      accountId: "PROVISIONED-USER",
+      role: "user",
+      defaultStorageMode: "session_only",
+      createdAt: T.created,
+    }).role,
+    "user",
+  );
+});
 
 test("外部身份只接受 issuer + subject digest，不以邮箱作数据键", () => {
   const store = setupStore();
@@ -195,6 +239,10 @@ test("session_only 不建持久档案，24 小时上限和到期清理均生效"
     (error: unknown) =>
       error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
   );
+  assert.doesNotMatch(
+    JSON.stringify(store.readAuditLog(ADMIN_AUDIT, "2026-08-05T08:02:00.000Z")),
+    /SESSION-B/,
+  );
 });
 
 test("A 不能用 ID 猜测读、写、导出或删除 B，且不暴露存在性", () => {
@@ -240,13 +288,46 @@ test("管理员缺原因或工单时失败，合法查看会留受控审计", ()
       error instanceof PrivacyError && error.code === "ADMIN_CONTEXT_REQUIRED",
   );
   store.readArchive(ADMIN, "ARCHIVE-A", T.record1);
-  const audit = store.readAuditLog(ADMIN, T.read);
+  const audit = store.readAuditLog(ADMIN_AUDIT, T.read);
   const adminRead = audit.find(
     (event) => event.action === "archive.read" && event.actorRole === "admin",
   );
   assert.equal(adminRead?.reasonCode, ADMIN.reasonCode);
   assert.equal(adminRead?.ticketId, ADMIN.ticketId);
   assert.equal(adminRead?.requestId, ADMIN.requestId);
+});
+
+test("管理员理由按具体操作收口，客服工单不能导出或删除", () => {
+  const store = setupStore();
+  createArchive(store);
+  assert.throws(
+    () =>
+      store.exportArchive(ADMIN, {
+        archiveId: "ARCHIVE-A",
+        exportJobId: "EXPORT-WRONG-REASON",
+        exportedAt: T.export,
+      }),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "ADMIN_CONTEXT_REQUIRED",
+  );
+  assert.throws(
+    () =>
+      store.deleteArchive(ADMIN, {
+        archiveId: "ARCHIVE-A",
+        receiptId: "DELETE-WRONG-REASON",
+        deletedAt: T.delete,
+      }),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "ADMIN_CONTEXT_REQUIRED",
+  );
+  assert.equal(
+    store.exportArchive(ADMIN_EXPORT, {
+      archiveId: "ARCHIVE-A",
+      exportJobId: "EXPORT-ADMIN-APPROVED",
+      exportedAt: T.export,
+    }).job.status,
+    "ready",
+  );
 });
 
 test("档案记录只追加新版本，旧版本与输出都不可原地修改", () => {
@@ -320,10 +401,79 @@ test("研究必须同时通过独立角色、study 分配和明确范围，撤�
     (error: unknown) =>
       error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
   );
-  const auditText = JSON.stringify(store.readAuditLog(ADMIN, T.export));
+  const auditText = JSON.stringify(store.readAuditLog(ADMIN_AUDIT, T.export));
   assert.match(auditText, /research_record\.read/);
   assert.doesNotMatch(auditText, /RESEARCH-1/);
   appendSecret(store, USER_A, "ARCHIVE-A", "RECORD-AFTER-RESEARCH-WITHDRAW", T.record2);
+});
+
+test("研究授权范围缩窄或记录到期后，旧副本立即不可读", () => {
+  const narrowed = setupStore();
+  createArchive(narrowed);
+  narrowed.recordConsent(USER_A, {
+    decisionId: "CONSENT-RESEARCH-GRANT-A",
+    archiveId: "ARCHIVE-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    policyVersion: "research-policy-v1",
+    scope: ["study:STUDY-001"],
+    occurredAt: T.consent1,
+  });
+  narrowed.createResearchRecord(RESEARCHER, {
+    researchRecordId: "RESEARCH-SCOPE-A",
+    archiveId: "ARCHIVE-A",
+    subjectDigest: digestIdentifier("SUBJECT-A"),
+    payload: { synthetic: true },
+    createdAt: T.derived1,
+    expiresAt: "2028-08-04T08:04:00.000Z",
+  });
+  narrowed.recordConsent(USER_A, {
+    decisionId: "CONSENT-RESEARCH-GRANT-B",
+    archiveId: "ARCHIVE-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    policyVersion: "research-policy-v2",
+    scope: ["study:STUDY-002"],
+    occurredAt: T.consent2,
+  });
+  assert.throws(
+    () => narrowed.readResearchRecord(RESEARCHER, "RESEARCH-SCOPE-A", T.record2),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
+  );
+
+  const expired = setupStore();
+  createArchive(expired);
+  expired.recordConsent(USER_A, {
+    decisionId: "CONSENT-RESEARCH-GRANT",
+    archiveId: "ARCHIVE-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    policyVersion: "research-policy-v1",
+    scope: ["study:STUDY-001"],
+    occurredAt: T.consent1,
+  });
+  expired.createResearchRecord(RESEARCHER, {
+    researchRecordId: "RESEARCH-EXPIRED",
+    archiveId: "ARCHIVE-A",
+    subjectDigest: digestIdentifier("SUBJECT-A"),
+    payload: { synthetic: true },
+    createdAt: T.derived1,
+    expiresAt: T.consent2,
+  });
+  assert.throws(
+    () => expired.readResearchRecord(RESEARCHER, "RESEARCH-EXPIRED", T.record2),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
+  );
+  assert.deepEqual(
+    expired.runRetention(SYS_RETENTION, T.consent2).purgedResearchRecordIds,
+    ["RESEARCH-EXPIRED"],
+  );
+  assert.doesNotMatch(
+    JSON.stringify(expired.readAuditLog(ADMIN_AUDIT, T.record2)),
+    /RESEARCH-EXPIRED/,
+  );
 });
 
 test("公开展示与研究不捆绑，管理员不能代同意，撤回后立即下架", () => {
@@ -331,7 +481,7 @@ test("公开展示与研究不捆绑，管理员不能代同意，撤回后立�
   createArchive(store);
   assert.throws(
     () =>
-      store.recordConsent(ADMIN, {
+      store.recordConsent(ADMIN_DELETE, {
         decisionId: "CONSENT-ADMIN-GRANT",
         archiveId: "ARCHIVE-A",
         purpose: "public_display",
@@ -352,7 +502,7 @@ test("公开展示与研究不捆绑，管理员不能代同意，撤回后立�
     scope: ["public_case"],
     occurredAt: T.consent1,
   });
-  const publicCase = store.createPublicCase(ADMIN, {
+  const publicCase = store.createPublicCase(ADMIN_PUBLIC, {
     publicCaseId: "PUBLIC-CASE-1",
     archiveId: "ARCHIVE-A",
     status: "published",
@@ -362,7 +512,7 @@ test("公开展示与研究不捆绑，管理员不能代同意，撤回后立�
     createdAt: T.derived1,
     publishedAt: T.derived1,
   });
-  assert.equal(store.readPublicCase(ADMIN, publicCase.publicCaseId, T.consent2).status, "published");
+  assert.equal(store.readPublicCase(ADMIN_PUBLIC, publicCase.publicCaseId, T.consent2).status, "published");
   store.recordConsent(USER_A, {
     decisionId: "CONSENT-PUBLIC-WITHDRAW",
     archiveId: "ARCHIVE-A",
@@ -373,13 +523,50 @@ test("公开展示与研究不捆绑，管理员不能代同意，撤回后立�
     occurredAt: T.record2,
   });
   assert.throws(
-    () => store.readPublicCase(ADMIN, publicCase.publicCaseId, T.export),
+    () => store.readPublicCase(ADMIN_PUBLIC, publicCase.publicCaseId, T.export),
     (error: unknown) =>
       error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
   );
-  const auditText = JSON.stringify(store.readAuditLog(ADMIN, T.read));
+  const auditText = JSON.stringify(store.readAuditLog(ADMIN_AUDIT, T.read));
   assert.match(auditText, /public_case\.read/);
   assert.doesNotMatch(auditText, /PUBLIC-CASE-1/);
+});
+
+test("公开授权范围缩窄后旧案例立即下架", () => {
+  const store = setupStore();
+  createArchive(store);
+  store.recordConsent(USER_A, {
+    decisionId: "CONSENT-PUBLIC-GRANT-A",
+    archiveId: "ARCHIVE-A",
+    purpose: "public_display",
+    action: "grant",
+    policyVersion: "public-policy-v1",
+    scope: ["public_case"],
+    occurredAt: T.consent1,
+  });
+  store.createPublicCase(ADMIN_PUBLIC, {
+    publicCaseId: "PUBLIC-SCOPE-A",
+    archiveId: "ARCHIVE-A",
+    status: "draft",
+    redactionVersion: "redaction-v1",
+    reviewerId: "REVIEWER-SYNTHETIC",
+    payload: { public: "synthetic" },
+    createdAt: T.derived1,
+  });
+  store.recordConsent(USER_A, {
+    decisionId: "CONSENT-PUBLIC-GRANT-B",
+    archiveId: "ARCHIVE-A",
+    purpose: "public_display",
+    action: "grant",
+    policyVersion: "public-policy-v2",
+    scope: ["private_review"],
+    occurredAt: T.consent2,
+  });
+  assert.throws(
+    () => store.readPublicCase(ADMIN_PUBLIC, "PUBLIC-SCOPE-A", T.record2),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
+  );
 });
 
 test("档案导出同时可机读和人读，只包含当前所有者的追加历史", () => {
@@ -489,7 +676,7 @@ test("删除档案会联删服务、研究、公开、索引和导出，审计�
     (error: unknown) =>
       error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
   );
-  const auditText = JSON.stringify(store.readAuditLog(ADMIN, T.read));
+  const auditText = JSON.stringify(store.readAuditLog(ADMIN_AUDIT, T.read));
   assert.doesNotMatch(auditText, /TOP-SECRET/);
   assert.doesNotMatch(auditText, /ARCHIVE-A/);
 });
@@ -511,6 +698,12 @@ test("注销账户联删档案、身份映射和会话，并保留无内容回�
     createdAt: T.record1,
     expiresAt: "2026-09-03T08:02:00.000Z",
   });
+  store.createSessionLease(USER_A, {
+    sessionId: "SESSION-A",
+    payload: { synthetic: true },
+    createdAt: T.record1,
+    expiresAt: "2026-08-05T08:02:00.000Z",
+  });
   const receipt = store.deleteAccount(USER_A, {
     accountId: USER_A.accountId,
     receiptId: "DELETE-ACCOUNT-A",
@@ -522,15 +715,18 @@ test("注销账户联删档案、身份映射和会话，并保留无内容回�
     (error: unknown) => error instanceof PrivacyError && error.code === "ACCOUNT_INACTIVE",
   );
   assert.equal(
-    store.getDeletionReceipt(ADMIN, "DELETE-ACCOUNT-A", T.read).targetDigest,
+    store.getDeletionReceipt(ADMIN_DELETE, "DELETE-ACCOUNT-A", T.read).targetDigest,
     receipt.targetDigest,
   );
-  const receiptAfterDeletion = store.getDeletionReceipt(ADMIN, "DELETE-ACCOUNT-A", T.read);
+  const receiptAfterDeletion = store.getDeletionReceipt(ADMIN_DELETE, "DELETE-ACCOUNT-A", T.read);
   assert.equal(receiptAfterDeletion.requestedByAccountId, undefined);
   assert.equal(receiptAfterDeletion.requestedByDigest, receipt.targetDigest);
-  const auditText = JSON.stringify(store.readAuditLog(ADMIN, T.read));
+  const auditText = JSON.stringify(store.readAuditLog(ADMIN_AUDIT, T.read));
   assert.doesNotMatch(auditText, /"ACCOUNT-A"/);
   assert.doesNotMatch(auditText, /DELETE-ACCOUNT-A/);
+  assert.doesNotMatch(auditText, /IDENTITY-A/);
+  assert.doesNotMatch(auditText, /AUTH-A/);
+  assert.doesNotMatch(auditText, /SESSION-A/);
   assert.match(auditText, /deletion_receipt\.read/);
 });
 
@@ -588,6 +784,79 @@ test("未分配的 study 不能靠伪造 principal 读取已授权研究副本",
     (error: unknown) =>
       error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
   );
+});
+
+test("研究分配复合键不会被 NUL 分隔符碰撞", () => {
+  const store = setupStore();
+  const assigned: ResearchPrincipal = {
+    role: "researcher",
+    accountId: "R",
+    requestId: "REQ-R-ASSIGNED",
+    studyId: "S\u0000T",
+  };
+  const collision: ResearchPrincipal = {
+    role: "researcher",
+    accountId: "R\u0000S",
+    requestId: "REQ-R-COLLISION",
+    studyId: "T",
+  };
+  store.createAccount(SYS_IDENTITY, {
+    accountId: assigned.accountId,
+    role: "researcher",
+    defaultStorageMode: "session_only",
+    createdAt: T.created,
+  });
+  store.createAccount(SYS_IDENTITY, {
+    accountId: collision.accountId,
+    role: "researcher",
+    defaultStorageMode: "session_only",
+    createdAt: T.created,
+  });
+  store.assignResearchStudy(SYS_IDENTITY, {
+    assignmentId: "ASSIGNMENT-NUL",
+    accountId: assigned.accountId,
+    studyId: assigned.studyId,
+    assignedAt: T.created,
+  });
+  createArchive(store);
+  store.recordConsent(USER_A, {
+    decisionId: "CONSENT-RESEARCH-COLLISION",
+    archiveId: "ARCHIVE-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    policyVersion: "research-policy-v1",
+    scope: ["study:T"],
+    occurredAt: T.consent1,
+  });
+  assert.throws(
+    () =>
+      store.createResearchRecord(collision, {
+        researchRecordId: "RESEARCH-COLLISION",
+        archiveId: "ARCHIVE-A",
+        subjectDigest: digestIdentifier("SUBJECT-COLLISION"),
+        payload: { synthetic: true },
+        createdAt: T.derived1,
+        expiresAt: "2028-08-04T08:04:00.000Z",
+      }),
+    (error: unknown) =>
+      error instanceof PrivacyError && error.code === "NOT_FOUND_OR_FORBIDDEN",
+  );
+});
+
+test("持久 payload 只接受有界 JSON，拒绝循环和可变容器", () => {
+  const store = setupStore();
+  createArchive(store);
+  const cyclic: { self?: unknown } = {};
+  cyclic.self = cyclic;
+  for (const [recordId, payload] of [
+    ["RECORD-CYCLIC", cyclic],
+    ["RECORD-MAP", new Map([["secret", "mutable"]])],
+  ] as const) {
+    assert.throws(
+      () => appendSecret(store, USER_A, "ARCHIVE-A", recordId, T.record1, payload),
+      (error: unknown) => error instanceof PrivacyError && error.code === "INVALID_INPUT",
+    );
+  }
 });
 
 test("运行时也拒绝未受控授权目的和时间倒序", () => {

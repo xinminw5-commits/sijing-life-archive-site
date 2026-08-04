@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -41,6 +42,16 @@ test("server-renders the finished consultation site", async () => {
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
+test("metadata does not trust an arbitrary Host header", async () => {
+  const response = await render("/", {
+    headers: { accept: "text/html", host: "attacker.example" },
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.doesNotMatch(html, /https:\/\/attacker\.example/);
+  assert.match(html, /https:\/\/example\.invalid\/og\.png/);
+});
+
 test("pilot route shows the invite gate without an access cookie", async () => {
   const response = await render("/pilot");
   assert.equal(response.status, 200);
@@ -50,6 +61,16 @@ test("pilot route shows the invite gate without an access cookie", async () => {
   assert.match(html, /请输入邀请人/);
   assert.match(html, /name="inviteCode"/);
   assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/);
+});
+
+test("encoded and normalized pilot paths cannot bypass the invite gate", async () => {
+  for (const pathname of ["/%70ilot", "/p%69lot", "/pilot%2fintake", "/x/../pilot"]) {
+    const response = await render(pathname);
+    assert.equal(response.status, 200, pathname);
+    const html = await response.text();
+    assert.match(html, /请输入邀请人/, pathname);
+    assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/, pathname);
+  }
 });
 
 test("pilot route rejects an incorrect invite code", async () => {
@@ -67,6 +88,42 @@ test("pilot route rejects an incorrect invite code", async () => {
   assert.equal(response.headers.get("set-cookie"), null);
 });
 
+test("pilot gate rejects unsupported or oversized request bodies before parsing", async () => {
+  const unsupported = await render("/pilot", {
+    method: "POST",
+    headers: { "content-type": "application/json", host: "localhost" },
+    body: JSON.stringify({ inviteCode: pilotInviteCode }),
+  });
+  assert.equal(unsupported.status, 415);
+  assert.equal(unsupported.headers.get("set-cookie"), null);
+
+  const oversized = await render("/pilot", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", host: "localhost" },
+    body: new URLSearchParams({ inviteCode: "X".repeat(2048) }),
+  });
+  assert.equal(oversized.status, 413);
+  assert.equal(oversized.headers.get("set-cookie"), null);
+});
+
+test("pilot access token has a server-verified expiry", async () => {
+  const expiredAt = Math.floor(Date.now() / 1000) - 1;
+  const signature = createHmac("sha256", pilotInviteCode)
+    .update(`pilot-access-v2:${expiredAt}`)
+    .digest("hex");
+  const response = await render("/pilot", {
+    headers: {
+      accept: "text/html",
+      cookie: `pilot_access=${expiredAt}.${signature}`,
+      host: "localhost",
+    },
+  });
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /请输入邀请人/);
+  assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/);
+});
+
 test("pilot route accepts the invite code and server-renders the intake", async () => {
   const unlockResponse = await render("/pilot", {
     method: "POST",
@@ -80,7 +137,7 @@ test("pilot route accepts the invite code and server-renders the intake", async 
   assert.equal(unlockResponse.status, 303);
   assert.equal(unlockResponse.headers.get("location"), "/pilot");
   const cookie = unlockResponse.headers.get("set-cookie");
-  assert.match(cookie ?? "", /^pilot_access=[a-f0-9]{64};/);
+  assert.match(cookie ?? "", /^pilot_access=\d{10}\.[a-f0-9]{64};/);
   assert.match(cookie ?? "", /HttpOnly/);
   assert.match(cookie ?? "", /SameSite=Lax/);
 

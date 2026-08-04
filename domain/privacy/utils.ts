@@ -4,9 +4,11 @@ export function clone<T>(value: T): T {
   return structuredClone(value) as T;
 }
 
-export function freeze<T>(value: T): T {
+export function freeze<T>(value: T, seen = new WeakSet<object>()): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
-    for (const child of Object.values(value as Record<string, unknown>)) freeze(child);
+    if (seen.has(value)) return value;
+    seen.add(value);
+    for (const child of Object.values(value as Record<string, unknown>)) freeze(child, seen);
     Object.freeze(value);
   }
   return value;
@@ -19,6 +21,47 @@ export function immutable<T>(value: T): T {
 export function assertNonEmpty(value: string, field: string): void {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new PrivacyError("INVALID_INPUT", `${field} 不能为空。`);
+  }
+}
+
+export function assertJsonValue(value: unknown, field: string): void {
+  const stack: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+  while (stack.length > 0) {
+    const item = stack.pop()!;
+    const current = item.value;
+    nodes += 1;
+    if (nodes > 10_000 || item.depth > 64) {
+      throw new PrivacyError("INVALID_INPUT", `${field} 超过安全结构上限。`);
+    }
+    if (
+      current === null ||
+      typeof current === "string" ||
+      typeof current === "boolean"
+    ) {
+      continue;
+    }
+    if (typeof current === "number") {
+      if (Number.isFinite(current)) continue;
+      throw new PrivacyError("INVALID_INPUT", `${field} 只能包含有限数值。`);
+    }
+    if (typeof current !== "object") {
+      throw new PrivacyError("INVALID_INPUT", `${field} 只能包含 JSON 值。`);
+    }
+    if (seen.has(current)) {
+      throw new PrivacyError("INVALID_INPUT", `${field} 不能包含循环引用。`);
+    }
+    seen.add(current);
+    if (!Array.isArray(current)) {
+      const prototype = Object.getPrototypeOf(current);
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new PrivacyError("INVALID_INPUT", `${field} 只能包含普通对象或数组。`);
+      }
+    }
+    for (const child of Object.values(current)) {
+      stack.push({ value: child, depth: item.depth + 1 });
+    }
   }
 }
 

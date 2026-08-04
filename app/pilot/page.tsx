@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PilotIntake } from "./PilotIntake";
 
 export const metadata: Metadata = {
@@ -17,13 +18,13 @@ export default function PilotPage() {
   return (
     <main className="pilot-page">
       <header className="site-header pilot-header">
-        <a className="brand" href="/" aria-label="返回四派人生档案会诊首页">
+        <Link className="brand" href="/" aria-label="返回四派人生档案会诊首页">
           <span className="brand-seal">四</span>
           <span>
             <strong>人生档案会诊</strong>
             <small>封闭内测 · PILOT V0</small>
           </span>
-        </a>
+        </Link>
         <nav aria-label="内测页导航">
           <a href="#how">流程</a>
           <a href="#criteria">入选条件</a>
@@ -40,7 +41,7 @@ export default function PilotPage() {
           </p>
           <div className="hero-actions">
             <a className="button button-primary" href="#intake">进入两阶段资料台 <span>↓</span></a>
-            <a className="text-link" href="/">返回服务介绍 <span>↗</span></a>
+            <Link className="text-link" href="/">返回服务介绍 <span>↗</span></Link>
           </div>
         </div>
         <aside className="pilot-hero-card">
@@ -122,14 +123,13 @@ export default function PilotPage() {
       </section>
 
       <footer>
-        <a className="brand footer-brand" href="/">
+        <Link className="brand footer-brand" href="/">
           <span className="brand-seal">四</span>
           <span><strong>人生档案会诊</strong><small>先盲断 · 后核验</small></span>
-        </a>
+        </Link>
         <p>参与不是认可结论；冲突与退出同样会被记录。</p>
         <a href="#top">回到顶部 ↑</a>
       </footer>
     </main>
   );
 }
-

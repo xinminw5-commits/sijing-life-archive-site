@@ -24,7 +24,8 @@ export type AdminReasonCode =
   | "user_support"
   | "user_export_request"
   | "user_deletion_request"
-  | "security_investigation";
+  | "security_investigation"
+  | "public_case_review";
 
 export interface UserPrincipal {
   role: "user";

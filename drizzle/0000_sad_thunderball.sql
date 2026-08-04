@@ -291,3 +291,36 @@ WHEN NOT EXISTS (
 BEGIN
 	SELECT RAISE(ABORT, 'active public_display consent required');
 END;
+--> statement-breakpoint
+CREATE TRIGGER `research_records_consent_cleanup`
+AFTER INSERT ON `consent_decisions`
+WHEN NEW.`purpose` = 'anonymous_research'
+BEGIN
+	DELETE FROM `research_records`
+	WHERE `archive_id` = NEW.`archive_id`
+		AND (
+			NEW.`action` = 'withdraw'
+			OR NOT EXISTS (
+				SELECT 1
+				FROM json_each(NEW.`scope_json`) AS `scope`
+				WHERE `scope`.`value` = 'all_approved_studies'
+					OR `scope`.`value` = 'study:' || `research_records`.`study_id`
+			)
+		);
+END;
+--> statement-breakpoint
+CREATE TRIGGER `public_cases_consent_cleanup`
+AFTER INSERT ON `consent_decisions`
+WHEN NEW.`purpose` = 'public_display'
+BEGIN
+	DELETE FROM `public_cases`
+	WHERE `archive_id` = NEW.`archive_id`
+		AND (
+			NEW.`action` = 'withdraw'
+			OR NOT EXISTS (
+				SELECT 1
+				FROM json_each(NEW.`scope_json`) AS `scope`
+				WHERE `scope`.`value` = 'public_case'
+			)
+		);
+END;

@@ -1,6 +1,7 @@
 import type {
   Account,
   AccountRole,
+  AdminReasonCode,
   AdminPrincipal,
   ArchiveExportBundle,
   ArchiveRecord,
@@ -36,6 +37,7 @@ import {
   addDays,
   addMonths,
   assertChronological,
+  assertJsonValue,
   assertNonEmpty,
   assertOneOf,
   assertTimestamp,
@@ -45,6 +47,21 @@ import {
 
 const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
 const MAX_AUTH_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const ADMIN_ACTION_REASONS: Readonly<Partial<Record<AuditAction, ReadonlyArray<AdminReasonCode>>>> = {
+  "archive.read": ["user_support", "security_investigation"],
+  "record.created": ["user_support"],
+  "consent.recorded": ["user_deletion_request"],
+  "public_case.created": ["public_case_review"],
+  "public_case.read": ["public_case_review"],
+  "index.created": ["user_support"],
+  "archive.exported": ["user_export_request"],
+  "export_job.read": ["user_export_request"],
+  "archive.deleted": ["user_deletion_request"],
+  "account.deleted": ["user_deletion_request"],
+  "deletion_receipt.read": ["user_deletion_request"],
+  "audit.read": ["security_investigation"],
+};
 
 interface CreateAccountInput {
   accountId: string;
@@ -100,7 +117,8 @@ export class InMemoryPrivacyStore {
     this.options = options;
   }
 
-  public createAccount(input: CreateAccountInput): Account {
+  public createAccount(principal: SystemPrincipal, input: CreateAccountInput): Account {
+    this.assertSystem(principal, "identity_provisioning");
     this.assertIdAvailable(input.accountId);
     assertNonEmpty(input.accountId, "accountId");
     assertOneOf(input.role, ["user", "admin", "researcher"] as const, "role");
@@ -120,7 +138,7 @@ export class InMemoryPrivacyStore {
     };
     this.accounts.set(account.accountId, immutable(account));
     this.audit(
-      this.systemPrincipal("identity_provisioning", `account-${input.accountId}`),
+      principal,
       "account.created",
       "account",
       input.createdAt,
@@ -219,6 +237,7 @@ export class InMemoryPrivacyStore {
     }
     this.assertIdAvailable(input.sessionId);
     this.assertBoundedDuration(input.createdAt, input.expiresAt, MAX_SESSION_MS, "session");
+    assertJsonValue(input.payload, "payload");
     const lease = immutable<SessionLease>({
       ...input,
       ownerAccountId: account.accountId,
@@ -344,6 +363,7 @@ export class InMemoryPrivacyStore {
     assertNonEmpty(input.schemaVersion, "schemaVersion");
     assertTimestamp(input.createdAt, "createdAt");
     assertChronological(archive.createdAt, input.createdAt, "recordCreation");
+    assertJsonValue(input.payload, "payload");
     if (input.supersedesRecordId) {
       const previous = this.records.get(input.supersedesRecordId);
       if (!previous || previous.archiveId !== archive.archiveId) {
@@ -420,6 +440,7 @@ export class InMemoryPrivacyStore {
     this.consents.set(decision.decisionId, decision);
     if (input.purpose === "anonymous_research") {
       if (input.action === "grant") {
+        this.deleteResearchOutsideScope(archive.archiveId, input.scope);
         this.replaceArchive(archive.archiveId, {
           storageMode: "personal_archive_research",
           updatedAt: input.occurredAt,
@@ -434,8 +455,10 @@ export class InMemoryPrivacyStore {
         });
       }
     }
-    if (input.purpose === "public_display" && input.action === "withdraw") {
-      this.deletePublicCasesForArchive(archive.archiveId);
+    if (input.purpose === "public_display") {
+      if (input.action === "withdraw" || !input.scope.includes("public_case")) {
+        this.deletePublicCasesForArchive(archive.archiveId);
+      }
     }
     if (input.purpose === "service_processing") {
       this.replaceArchive(archive.archiveId, {
@@ -471,6 +494,7 @@ export class InMemoryPrivacyStore {
       throw new PrivacyError("INVALID_INPUT", "researchRetention 超过 24 个月上限。");
     }
     assertNonEmpty(input.subjectDigest, "subjectDigest");
+    assertJsonValue(input.payload, "payload");
     const record = immutable<ResearchRecord>({
       ...input,
       ownerAccountId: archive.ownerAccountId,
@@ -495,7 +519,14 @@ export class InMemoryPrivacyStore {
     assertTimestamp(readAt, "readAt");
     const record = this.researchRecords.get(researchRecordId);
     if (!record || record.studyId !== principal.studyId) throw this.notFoundOrForbidden();
-    this.requireGrantedConsent(record.archiveId, "anonymous_research");
+    if (isAtOrAfter(readAt, record.expiresAt)) throw this.notFoundOrForbidden();
+    const consent = this.requireGrantedConsent(record.archiveId, "anonymous_research");
+    if (
+      !consent.scope.includes(`study:${principal.studyId}`) &&
+      !consent.scope.includes("all_approved_studies")
+    ) {
+      throw this.notFoundOrForbidden();
+    }
     this.audit(principal, "research_record.read", "research_record", readAt, {
       targetId: record.researchRecordId,
     });
@@ -507,7 +538,7 @@ export class InMemoryPrivacyStore {
     input: Omit<PublicCase, "ownerAccountId" | "consentDecisionId">,
   ): PublicCase {
     this.requirePrincipal(principal);
-    this.assertAdmin(principal);
+    this.assertAdminAction(principal, "public_case.created");
     const archive = this.requireArchive(input.archiveId);
     const consent = this.requireGrantedConsent(archive.archiveId, "public_display");
     if (!consent.scope.includes("public_case")) {
@@ -518,6 +549,7 @@ export class InMemoryPrivacyStore {
     assertNonEmpty(input.redactionVersion, "redactionVersion");
     assertNonEmpty(input.reviewerId, "reviewerId");
     assertTimestamp(input.createdAt, "createdAt");
+    assertJsonValue(input.payload, "payload");
     if (input.status === "published") {
       if (!input.publishedAt) throw new PrivacyError("INVALID_INPUT", "publishedAt 缺失。");
       assertChronological(input.createdAt, input.publishedAt, "publication");
@@ -567,11 +599,12 @@ export class InMemoryPrivacyStore {
     readAt: string,
   ): PublicCase {
     this.requirePrincipal(principal);
-    this.assertAdmin(principal);
+    this.assertAdminAction(principal, "public_case.read");
     assertTimestamp(readAt, "readAt");
     const publicCase = this.publicCases.get(publicCaseId);
     if (!publicCase) throw this.notFoundOrForbidden();
-    this.requireGrantedConsent(publicCase.archiveId, "public_display");
+    const consent = this.requireGrantedConsent(publicCase.archiveId, "public_display");
+    if (!consent.scope.includes("public_case")) throw this.notFoundOrForbidden();
     this.audit(principal, "public_case.read", "public_case", readAt, {
       targetId: publicCaseId,
     });
@@ -627,7 +660,7 @@ export class InMemoryPrivacyStore {
     assertTimestamp(readAt, "readAt");
     const job = this.exportJobs.get(exportJobId);
     if (!job || isAtOrAfter(readAt, job.expiresAt)) throw this.notFoundOrForbidden();
-    this.authorizeArchive(principal, job.archiveId, "archive.read", readAt);
+    this.authorizeArchive(principal, job.archiveId, "export_job.read", readAt);
     this.audit(principal, "export_job.read", "export_job", readAt, {
       targetDigest: this.options.digestIdentifier(job.exportJobId),
     });
@@ -653,7 +686,7 @@ export class InMemoryPrivacyStore {
       this.auditDenied(principal, "account.deleted", "account", input.accountId, input.deletedAt);
       throw this.notFoundOrForbidden();
     }
-    if (principal.role === "admin") this.assertAdmin(principal);
+    if (principal.role === "admin") this.assertAdminAction(principal, "account.deleted");
     const account = this.requireActiveAccount(input.accountId);
     assertTimestamp(input.deletedAt, "deletedAt");
     this.assertIdAvailable(input.receiptId);
@@ -666,17 +699,33 @@ export class InMemoryPrivacyStore {
         });
       }
     }
+    const childAuditTargets: Array<{ targetType: string; targetId: string }> = [];
     for (const [id, identity] of this.identities) {
-      if (identity.accountId === account.accountId) this.identities.delete(id);
+      if (identity.accountId === account.accountId) {
+        childAuditTargets.push({ targetType: "external_identity", targetId: id });
+        this.identities.delete(id);
+      }
     }
     for (const [id, session] of this.authSessions) {
-      if (session.accountId === account.accountId) this.authSessions.delete(id);
+      if (session.accountId === account.accountId) {
+        childAuditTargets.push({ targetType: "auth_session", targetId: id });
+        this.authSessions.delete(id);
+      }
     }
     for (const [key, assignment] of this.researchAssignments) {
-      if (assignment.accountId === account.accountId) this.researchAssignments.delete(key);
+      if (assignment.accountId === account.accountId) {
+        childAuditTargets.push({
+          targetType: "research_assignment",
+          targetId: assignment.assignmentId,
+        });
+        this.researchAssignments.delete(key);
+      }
     }
     for (const [id, lease] of this.sessionLeases) {
-      if (lease.ownerAccountId === account.accountId) this.sessionLeases.delete(id);
+      if (lease.ownerAccountId === account.accountId) {
+        childAuditTargets.push({ targetType: "session", targetId: id });
+        this.sessionLeases.delete(id);
+      }
     }
     const deletedAccount = immutable<Account>({
       ...account,
@@ -687,6 +736,13 @@ export class InMemoryPrivacyStore {
     this.accounts.set(account.accountId, deletedAccount);
     const targetDigest = this.options.digestIdentifier(account.accountId);
     this.scrubAuditTarget("account", account.accountId, targetDigest);
+    for (const child of childAuditTargets) {
+      this.scrubAuditTarget(
+        child.targetType,
+        child.targetId,
+        this.options.digestIdentifier(child.targetId),
+      );
+    }
     this.scrubAuditActor(account.accountId, targetDigest);
     for (const [id, priorReceipt] of this.deletionReceipts) {
       if (priorReceipt.requestedByAccountId === account.accountId) {
@@ -717,7 +773,7 @@ export class InMemoryPrivacyStore {
     readAt: string,
   ): DeletionReceipt {
     this.requirePrincipal(principal);
-    this.assertAdmin(principal);
+    this.assertAdminAction(principal, "deletion_receipt.read");
     assertTimestamp(readAt, "readAt");
     const receipt = this.deletionReceipts.get(receiptId);
     if (!receipt) throw this.notFoundOrForbidden();
@@ -732,7 +788,7 @@ export class InMemoryPrivacyStore {
     readAt: string,
   ): ReadonlyArray<AuditEvent> {
     this.requirePrincipal(principal);
-    this.assertAdmin(principal);
+    this.assertAdminAction(principal, "audit.read");
     assertTimestamp(readAt, "readAt");
     const result = immutable([...this.auditEvents.values()]);
     this.audit(principal, "audit.read", "audit_log", readAt, {});
@@ -752,11 +808,15 @@ export class InMemoryPrivacyStore {
     for (const [id, lease] of this.sessionLeases) {
       if (isAtOrAfter(asOf, lease.expiresAt)) {
         this.sessionLeases.delete(id);
+        this.scrubAuditTarget("session", id, this.options.digestIdentifier(id));
         purgedSessionIds.push(id);
       }
     }
     for (const [id, session] of this.authSessions) {
-      if (isAtOrAfter(asOf, session.expiresAt)) this.authSessions.delete(id);
+      if (isAtOrAfter(asOf, session.expiresAt)) {
+        this.authSessions.delete(id);
+        this.scrubAuditTarget("auth_session", id, this.options.digestIdentifier(id));
+      }
     }
     for (const [id, job] of this.exportJobs) {
       if (isAtOrAfter(asOf, job.expiresAt)) {
@@ -767,6 +827,7 @@ export class InMemoryPrivacyStore {
     for (const [id, record] of this.researchRecords) {
       if (isAtOrAfter(asOf, record.expiresAt)) {
         this.researchRecords.delete(id);
+        this.scrubAuditTarget("research_record", id, this.options.digestIdentifier(id));
         purgedResearchRecordIds.push(id);
       }
     }
@@ -883,6 +944,7 @@ export class InMemoryPrivacyStore {
   ): UserArchive {
     this.requirePrincipal(principal);
     assertTimestamp(occurredAt, "occurredAt");
+    if (principal.role === "admin") this.assertAdminAction(principal, action);
     const archive = this.archives.get(archiveId);
     if (!archive) {
       this.auditDenied(principal, action, "archive", archiveId, occurredAt);
@@ -892,7 +954,6 @@ export class InMemoryPrivacyStore {
       return archive;
     }
     if (principal.role === "admin") {
-      this.assertAdmin(principal);
       return archive;
     }
     this.auditDenied(principal, action, "archive", archiveId, occurredAt);
@@ -933,11 +994,23 @@ export class InMemoryPrivacyStore {
         "user_export_request",
         "user_deletion_request",
         "security_investigation",
+        "public_case_review",
       ] as const,
       "reasonCode",
     );
     assertNonEmpty(principal.ticketId, "ticketId");
     assertNonEmpty(principal.requestId, "requestId");
+  }
+
+  private assertAdminAction(principal: AdminPrincipal, action: AuditAction): void {
+    this.assertAdmin(principal);
+    const allowedReasons = ADMIN_ACTION_REASONS[action];
+    if (!allowedReasons?.includes(principal.reasonCode)) {
+      throw new PrivacyError(
+        "ADMIN_CONTEXT_REQUIRED",
+        `管理员原因 ${principal.reasonCode} 不允许执行 ${action}。`,
+      );
+    }
   }
 
   private assertSystem(
@@ -953,13 +1026,6 @@ export class InMemoryPrivacyStore {
       throw new PrivacyError("ADMIN_CONTEXT_REQUIRED", "系统操作上下文不合法。");
     }
     assertNonEmpty(principal.requestId, "requestId");
-  }
-
-  private systemPrincipal(
-    reasonCode: SystemPrincipal["reasonCode"],
-    requestId: string,
-  ): SystemPrincipal {
-    return { role: "system", accountId: "system", reasonCode, requestId };
   }
 
   private requireActiveAccount(accountId: string): Account {
@@ -1032,6 +1098,19 @@ export class InMemoryPrivacyStore {
   private deleteResearchForArchive(archiveId: string): void {
     for (const [id, record] of this.researchRecords) {
       if (record.archiveId === archiveId) {
+        this.researchRecords.delete(id);
+        this.scrubAuditTarget("research_record", id, this.options.digestIdentifier(id));
+      }
+    }
+  }
+
+  private deleteResearchOutsideScope(
+    archiveId: string,
+    scope: ReadonlyArray<string>,
+  ): void {
+    if (scope.includes("all_approved_studies")) return;
+    for (const [id, record] of this.researchRecords) {
+      if (record.archiveId === archiveId && !scope.includes(`study:${record.studyId}`)) {
         this.researchRecords.delete(id);
         this.scrubAuditTarget("research_record", id, this.options.digestIdentifier(id));
       }
@@ -1189,6 +1268,6 @@ export class InMemoryPrivacyStore {
   }
 
   private researchAssignmentKey(accountId: string, studyId: string): string {
-    return `${accountId}\u0000${studyId}`;
+    return JSON.stringify([accountId, studyId]);
   }
 }

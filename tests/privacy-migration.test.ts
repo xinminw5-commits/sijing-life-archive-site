@@ -48,11 +48,20 @@ function insertConsent(
     purpose: "service_processing" | "anonymous_research" | "public_display";
     action: "grant" | "withdraw";
     at: string;
+    scope?: ReadonlyArray<string>;
   },
 ): void {
   db.prepare(
-    "INSERT INTO consent_decisions (id, archive_id, owner_account_id, purpose, action, policy_version, scope_json, occurred_at) VALUES (?, ?, ?, ?, ?, 'policy-v1', '[\"synthetic\"]', ?)",
-  ).run(input.id, input.archiveId, input.owner, input.purpose, input.action, input.at);
+    "INSERT INTO consent_decisions (id, archive_id, owner_account_id, purpose, action, policy_version, scope_json, occurred_at) VALUES (?, ?, ?, ?, ?, 'policy-v1', ?, ?)",
+  ).run(
+    input.id,
+    input.archiveId,
+    input.owner,
+    input.purpose,
+    input.action,
+    JSON.stringify(input.scope ?? ["synthetic"]),
+    input.at,
+  );
 }
 
 function insertArchiveRecord(db: DatabaseSync, id: string, archiveId: string, owner: string): void {
@@ -78,8 +87,10 @@ test("首版 D1 迁移可在 SQLite 完整执行，13 张表和关键触发器�
     "archive_records_append_only",
     "archive_records_service_consent_guard",
     "consent_decisions_append_only",
+    "public_cases_consent_cleanup",
     "public_cases_consent_guard",
     "research_records_consent_and_assignment_guard",
+    "research_records_consent_cleanup",
   ]);
   db.close();
 });
@@ -116,6 +127,7 @@ test("数据库层强制服务授权、受控枚举和追加不改写", () => {
     purpose: "service_processing",
     action: "grant",
     at: "2026-08-04T08:02:00.000Z",
+    scope: ["study:STUDY-1"],
   });
   insertArchiveRecord(db, "RECORD-VALID", "ARCHIVE-A", "ACCOUNT-A");
   assert.throws(
@@ -139,7 +151,12 @@ test("数据库层强制服务授权、受控枚举和追加不改写", () => {
     purpose: "service_processing",
     action: "withdraw",
     at: "2026-08-04T08:04:00.000Z",
+    scope: ["study:STUDY-1"],
   });
+  assert.equal(
+    (db.prepare("SELECT COUNT(*) AS count FROM research_records").get() as { count: number }).count,
+    0,
+  );
   assert.throws(
     () => insertArchiveRecord(db, "RECORD-AFTER-WITHDRAW", "ARCHIVE-A", "ACCOUNT-A"),
     /active service_processing consent required/,
@@ -152,6 +169,68 @@ test("数据库层强制服务授权、受控枚举和追加不改写", () => {
         )
         .run(),
     /CHECK constraint failed: audit_events_privileged_context_check/,
+  );
+  db.close();
+});
+
+test("数据库层在研究或公开授权范围缩窄时立即清除旧副本", () => {
+  const db = migratedDatabase();
+  insertAccount(db, "ACCOUNT-A");
+  insertAccount(db, "ACCOUNT-R", "researcher");
+  insertArchive(db, "ARCHIVE-A", "ACCOUNT-A");
+  db.prepare(
+    "INSERT INTO research_study_assignments (id, account_id, study_id, assigned_at) VALUES ('ASSIGN-1', 'ACCOUNT-R', 'STUDY-1', '2026-08-04T08:01:30.000Z')",
+  ).run();
+  insertConsent(db, {
+    id: "CONSENT-RESEARCH-GRANT-A",
+    archiveId: "ARCHIVE-A",
+    owner: "ACCOUNT-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    at: "2026-08-04T08:02:00.000Z",
+    scope: ["study:STUDY-1"],
+  });
+  db.prepare(
+    "INSERT INTO research_records (id, archive_id, owner_account_id, consent_decision_id, study_id, subject_digest, payload_ciphertext, payload_nonce, payload_auth_tag, key_version, created_at, expires_at) VALUES ('RESEARCH-1', 'ARCHIVE-A', 'ACCOUNT-A', 'CONSENT-RESEARCH-GRANT-A', 'STUDY-1', 'subject-digest', 'ciphertext', 'nonce', 'tag', 'key-v1', '2026-08-04T08:03:00.000Z', '2028-08-04T08:03:00.000Z')",
+  ).run();
+  insertConsent(db, {
+    id: "CONSENT-RESEARCH-GRANT-B",
+    archiveId: "ARCHIVE-A",
+    owner: "ACCOUNT-A",
+    purpose: "anonymous_research",
+    action: "grant",
+    at: "2026-08-04T08:04:00.000Z",
+    scope: ["study:STUDY-2"],
+  });
+  assert.equal(
+    (db.prepare("SELECT COUNT(*) AS count FROM research_records").get() as { count: number }).count,
+    0,
+  );
+
+  insertConsent(db, {
+    id: "CONSENT-PUBLIC-GRANT-A",
+    archiveId: "ARCHIVE-A",
+    owner: "ACCOUNT-A",
+    purpose: "public_display",
+    action: "grant",
+    at: "2026-08-04T08:05:00.000Z",
+    scope: ["public_case"],
+  });
+  db.prepare(
+    "INSERT INTO public_cases (id, archive_id, owner_account_id, consent_decision_id, status, redaction_version, reviewer_id, payload_ciphertext, payload_nonce, payload_auth_tag, key_version, created_at) VALUES ('PUBLIC-1', 'ARCHIVE-A', 'ACCOUNT-A', 'CONSENT-PUBLIC-GRANT-A', 'draft', 'redaction-v1', 'reviewer-1', 'ciphertext', 'nonce', 'tag', 'key-v1', '2026-08-04T08:06:00.000Z')",
+  ).run();
+  insertConsent(db, {
+    id: "CONSENT-PUBLIC-GRANT-B",
+    archiveId: "ARCHIVE-A",
+    owner: "ACCOUNT-A",
+    purpose: "public_display",
+    action: "grant",
+    at: "2026-08-04T08:07:00.000Z",
+    scope: ["private_review"],
+  });
+  assert.equal(
+    (db.prepare("SELECT COUNT(*) AS count FROM public_cases").get() as { count: number }).count,
+    0,
   );
   db.close();
 });

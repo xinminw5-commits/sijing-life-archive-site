@@ -29,6 +29,8 @@ interface ExecutionContext {
 const PILOT_PATH = "/pilot";
 const PILOT_COOKIE = "pilot_access";
 const PILOT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+const PILOT_FORM_MAX_BYTES = 1024;
+const PILOT_CODE_MAX_LENGTH = 256;
 const textEncoder = new TextEncoder();
 
 const worker = {
@@ -46,7 +48,7 @@ const worker = {
       }, allowedWidths);
     }
 
-    if (url.pathname === PILOT_PATH || url.pathname.startsWith(`${PILOT_PATH}/`)) {
+    if (isPilotPath(url.pathname)) {
       return handlePilotAccess(request, env, ctx);
     }
 
@@ -67,10 +69,9 @@ async function handlePilotAccess(
     });
   }
 
-  const expectedToken = await pilotAccessToken(inviteCode);
   const currentToken = readCookie(request.headers.get("cookie"), PILOT_COOKIE);
 
-  if (currentToken && constantTimeEqual(currentToken, expectedToken)) {
+  if (currentToken && await verifyPilotAccessToken(currentToken, inviteCode)) {
     const response = await handler.fetch(request, env, ctx);
     const headers = new Headers(response.headers);
     headers.set("cache-control", "private, no-store");
@@ -82,8 +83,18 @@ async function handlePilotAccess(
   }
 
   if (request.method === "POST") {
-    const submittedCode = await readSubmittedInviteCode(request);
-    if (submittedCode && await inviteCodesMatch(submittedCode, inviteCode)) {
+    const submitted = await readSubmittedInviteCode(request);
+    if (!submitted.ok) {
+      return inviteGateResponse({
+        status: submitted.status,
+        message: submitted.status === 413
+          ? "提交内容过大，请只输入邀请码。"
+          : "只接受内测入口表单提交。",
+      });
+    }
+    if (submitted.code && await inviteCodesMatch(submitted.code, inviteCode)) {
+      const expiresAt = Math.floor(Date.now() / 1000) + PILOT_COOKIE_MAX_AGE;
+      const accessToken = await pilotAccessToken(inviteCode, expiresAt);
       const headers = new Headers({
         "cache-control": "no-store",
         location: PILOT_PATH,
@@ -91,7 +102,7 @@ async function handlePilotAccess(
       headers.append(
         "set-cookie",
         [
-          `${PILOT_COOKIE}=${expectedToken}`,
+          `${PILOT_COOKIE}=${accessToken}`,
           `Path=${PILOT_PATH}`,
           `Max-Age=${PILOT_COOKIE_MAX_AGE}`,
           "HttpOnly",
@@ -119,13 +130,49 @@ async function handlePilotAccess(
   return inviteGateResponse();
 }
 
-async function readSubmittedInviteCode(request: Request): Promise<string | null> {
+type InviteCodeReadResult =
+  | { ok: true; code: string | null }
+  | { ok: false; status: 413 | 415 };
+
+async function readSubmittedInviteCode(request: Request): Promise<InviteCodeReadResult> {
+  const mediaType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+  if (mediaType !== "application/x-www-form-urlencoded") {
+    return { ok: false, status: 415 };
+  }
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > PILOT_FORM_MAX_BYTES) {
+    return { ok: false, status: 413 };
+  }
+  if (!request.body) return { ok: true, code: null };
+
   try {
-    const form = await request.formData();
-    const value = form.get("inviteCode");
-    return typeof value === "string" ? value.trim() : null;
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > PILOT_FORM_MAX_BYTES) {
+        await reader.cancel();
+        return { ok: false, status: 413 };
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    const value = new URLSearchParams(new TextDecoder().decode(bytes)).get("inviteCode");
+    const code = typeof value === "string" ? value.trim() : null;
+    if (code && code.length > PILOT_CODE_MAX_LENGTH) {
+      return { ok: false, status: 413 };
+    }
+    return { ok: true, code };
   } catch {
-    return null;
+    return { ok: true, code: null };
   }
 }
 
@@ -137,7 +184,7 @@ async function inviteCodesMatch(submitted: string, expected: string): Promise<bo
   return constantTimeEqual(submittedHash, expectedHash);
 }
 
-async function pilotAccessToken(inviteCode: string): Promise<string> {
+async function pilotAccessToken(inviteCode: string, expiresAt: number): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     textEncoder.encode(inviteCode),
@@ -148,9 +195,47 @@ async function pilotAccessToken(inviteCode: string): Promise<string> {
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
-    textEncoder.encode("pilot-access-v1"),
+    textEncoder.encode(`pilot-access-v2:${expiresAt}`),
   );
-  return toHex(new Uint8Array(signature));
+  return `${expiresAt}.${toHex(new Uint8Array(signature))}`;
+}
+
+async function verifyPilotAccessToken(token: string, inviteCode: string): Promise<boolean> {
+  const [expiresAtText, signature, extra] = token.split(".");
+  if (extra !== undefined || !/^\d{10}$/.test(expiresAtText) || !/^[a-f0-9]{64}$/.test(signature)) {
+    return false;
+  }
+  const expiresAt = Number(expiresAtText);
+  const now = Math.floor(Date.now() / 1000);
+  if (expiresAt <= now || expiresAt > now + PILOT_COOKIE_MAX_AGE) return false;
+  const expected = await pilotAccessToken(inviteCode, expiresAt);
+  return constantTimeEqual(token, expected);
+}
+
+function isPilotPath(pathname: string): boolean {
+  let candidate = pathname;
+  for (let pass = 0; pass < 5; pass += 1) {
+    const normalized = normalizePath(candidate);
+    if (normalized === PILOT_PATH || normalized.startsWith(`${PILOT_PATH}/`)) return true;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function normalizePath(pathname: string): string {
+  const segments: string[] = [];
+  for (const segment of pathname.replaceAll("\\", "/").split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") segments.pop();
+    else segments.push(segment);
+  }
+  return `/${segments.join("/")}`;
 }
 
 async function sha256(value: string): Promise<string> {
