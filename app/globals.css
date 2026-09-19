@@ -739,6 +739,39 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   resize: vertical;
 }
 .pilot-packet > button { justify-self: start; background: var(--teal); }
+.pilot-error {
+  margin-top: 24px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--vermillion);
+  background: #f7e9df;
+  color: #8b3f2e;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.pilot-profile {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+  padding: 24px;
+  border: 1px solid rgba(24, 63, 58, .24);
+  background: #edf0ea;
+}
+.pilot-profile > div:first-child { display: flex; justify-content: space-between; gap: 20px; }
+.pilot-profile > div:first-child span { color: var(--teal); font-size: 12px; font-weight: 700; }
+.pilot-profile > div:first-child small { color: #777f7a; font-size: 9px; }
+.pilot-profile-status { display: grid; gap: 4px; padding: 13px 15px; background: #fffdf8; }
+.pilot-profile-status b { color: var(--vermillion); font-family: var(--serif); font-size: 16px; }
+.pilot-profile-status span { color: var(--ink-soft); font-size: 11px; line-height: 1.6; }
+.pilot-pillars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pilot-pillars div { display: grid; gap: 6px; padding: 16px 12px; border: 1px solid var(--line); background: #fff; text-align: center; }
+.pilot-pillars small, .pilot-profile-grid span { color: #777f7a; font-size: 10px; }
+.pilot-pillars strong { color: var(--teal); font-family: var(--serif); font-size: 22px; }
+.pilot-pillars span { color: var(--ink-soft); font-size: 10px; }
+.pilot-profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pilot-profile-grid section { padding: 14px 15px; border: 1px solid var(--line); background: #fffdf8; }
+.pilot-profile-grid span { display: block; }
+.pilot-profile-grid b { display: block; margin-top: 5px; color: var(--ink); font-size: 15px; }
+.pilot-profile-grid p { margin: 5px 0 0; color: var(--ink-soft); font-size: 10px; line-height: 1.65; }
 .pilot-next-action {
   padding: 15px 17px;
   border-left: 3px solid var(--vermillion);
@@ -885,6 +918,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .pilot-generate button, .pilot-packet > button { width: 100%; }
   .pilot-packet { padding: 17px; }
   .pilot-packet > div:first-child { flex-direction: column; gap: 4px; }
+  .pilot-profile { padding: 17px; }
+  .pilot-profile > div:first-child { flex-direction: column; gap: 4px; }
+  .pilot-pillars { grid-template-columns: repeat(2, 1fr); }
+  .pilot-profile-grid { grid-template-columns: 1fr; }
   .pilot-lock-banner { align-items: flex-start; flex-direction: column; gap: 14px; }
   .pilot-anchors article { padding: 18px 14px; }
 }

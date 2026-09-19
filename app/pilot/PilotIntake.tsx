@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { calculateDeterministicChart, ChartCalculationError, type DeterministicChartResult } from "../../domain/chart/index.ts";
 
 type IntakeStage = "birth" | "facts";
 
@@ -20,10 +21,26 @@ const emptyAnchor = (): Anchor => ({
   evidence: "",
 });
 
+function parseDate(value: string) {
+  const match = value.trim().match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?$/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+function parseTime(value: string) {
+  const match = value.trim().match(/^(\d{1,2})(?::|点)(\d{0,2})?/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
 export function PilotIntake() {
   const [stage, setStage] = useState<IntakeStage>("birth");
   const [copied, setCopied] = useState<"birth" | "facts" | null>(null);
-  const [birthPacket, setBirthPacket] = useState("");
+  const [chartResult, setChartResult] = useState<DeterministicChartResult | null>(null);
+  const [chartError, setChartError] = useState("");
   const [factsPacket, setFactsPacket] = useState("");
   const [eligible, setEligible] = useState({
     adult: false,
@@ -94,7 +111,8 @@ export function PilotIntake() {
 
   function updateBirth<K extends keyof typeof birth>(key: K, value: (typeof birth)[K]) {
     setBirth((current) => ({ ...current, [key]: value }));
-    setBirthPacket("");
+    setChartResult(null);
+    setChartError("");
   }
 
   function updateLock<K extends keyof typeof lock>(key: K, value: (typeof lock)[K]) {
@@ -123,37 +141,62 @@ export function PilotIntake() {
 
   function buildBirthPacket() {
     if (!birthReady) return;
-    const track =
-      birth.familiarity === "完全不了解"
-        ? "前瞻样本候选"
-        : "需要人工评估信息污染；可能转为回顾性样本";
-    const packet = [
-      "【公开体验｜第一阶段出生资料包】",
-      "表单版本：pilot-v0",
-      "重要声明：本资料包不含人生经历；尚未形成盲断结论。",
-      "",
-      `自定代号：${birth.alias.trim() || "未填写"}`,
-      `日历类型：${birth.calendar}`,
-      `出生日期：${birth.date.trim()}`,
-      `出生时间：${birth.time.trim()}`,
-      `时间来源：${birth.source}`,
-      `来源补充：${birth.sourceNote.trim() || "无"}`,
-      `时间精度：${birth.precision}`,
-      `出生城市/区县：${birth.place.trim()}`,
-      `时区/时制：${birth.timezone}`,
-      `分析所需性别标记：${birth.genderMarker}`,
-      `分析者对经历的了解程度：${birth.familiarity}`,
-      `已知上下文边界：${birth.knownContext.trim() || "未补充"}`,
-      `样本轨道建议：${track}`,
-      "",
-      "【授权】",
-      `完成本次内测所需处理：${birth.serviceConsent ? "同意" : "不同意"}`,
-      `去标识化后用于内部规则研究：${birth.researchConsent ? "同意" : "不同意"}`,
-      `用于公开案例展示：${birth.publicConsent ? "同意" : "不同意"}`,
-      "",
-      "下一步：由分析者核对时间来源、精度和边界；在收到任何人生事实前完成并锁定盲断。",
-    ].join("\n");
-    setBirthPacket(packet);
+    const date = parseDate(birth.date);
+    const time = parseTime(birth.time);
+    if (!date || !time) {
+      setChartError("请把出生日期写成 1995-08-16，出生时间写成 14:35 或 14点30分。网站才能直接计算。");
+      return;
+    }
+    if (birth.calendar === "不确定，需要核对") {
+      setChartError("日历类型还不确定，暂时不能直接生成准确结果；请先确认是公历还是农历。");
+      return;
+    }
+    if (birth.genderMarker === "暂不提供，先确认是否影响排盘") {
+      setChartError("当前大运计算需要性别标记。你可以先选择男或女，之后仍可在页面里重新修改。");
+      return;
+    }
+    try {
+      const result = calculateDeterministicChart({
+        calendar: birth.calendar === "公历" ? "gregorian" : "chinese_lunar",
+        date,
+        time,
+        timeZone: "Asia/Shanghai",
+        clockStandard: "china_standard_time",
+        calculationTimeBasis: "china_standard_time",
+        dayBoundary: "zi_hour_starts_next_day",
+        gender: birth.genderMarker === "女" ? "woman" : "man",
+        birthPlace: { city: birth.place.trim() },
+        source: {
+          timeSource: birth.source.slice(0, 2) as "S0" | "S1" | "S2" | "S3",
+          timePrecision: birth.precision.slice(0, 2) as "P0" | "P1" | "P2" | "P3",
+          calendarConfirmed: true,
+        },
+      });
+      setChartResult(result);
+      setChartError("");
+    } catch (error) {
+      setChartResult(null);
+      setChartError(error instanceof ChartCalculationError ? error.message : "这组出生资料暂时无法计算，请检查日期和时间格式。");
+    }
+  }
+
+  function chartSummary() {
+    if (!chartResult) return "";
+    const variant = chartResult.selectedVariant;
+    const lines = [
+      "【四镜人生档案｜网页自动生成】",
+      `出生资料：${birth.date.trim()} ${birth.time.trim()} · ${birth.place.trim()}`,
+      `计算状态：${chartResult.status === "confirmed_single" ? "单一结果" : chartResult.status === "provisional_single" ? "暂定单一结果" : "存在多个候选结果，需要核对时间"}`,
+    ];
+    if (variant) {
+      lines.push(`四柱：${variant.pillars.map((pillar) => pillar.name).join("｜")}`);
+      lines.push(`日主：${variant.pillars.find((pillar) => pillar.position === "day")?.stem || "待确认"}`);
+      lines.push("大运：" + variant.childLimit.decadeFortunes.map((fortune) => `${fortune.name}（${fortune.startAge}—${fortune.endAge}岁）`).join("、"));
+    } else {
+      lines.push("当前存在候选命盘，网页不会替你强行选定其中一个。");
+    }
+    lines.push("说明：这是网页按固定规则生成的结构化结果，不代表未经核验的确定性人生结论。");
+    return lines.join("\n");
   }
 
   function buildFactsPacket() {
@@ -206,8 +249,9 @@ export function PilotIntake() {
     setAnchors([emptyAnchor(), emptyAnchor(), emptyAnchor()]);
     setBackground("");
     setFactsConsent(false);
-    setBirthPacket("");
     setFactsPacket("");
+    setChartResult(null);
+    setChartError("");
     setCopied(null);
   }
 
@@ -216,7 +260,7 @@ export function PilotIntake() {
       <div className="pilot-workbench-head">
         <div>
           <p className="eyebrow"><span /> 两阶段资料台</p>
-          <h2 id="pilot-form-title">先生成资料包，再由均均完成人工初判。</h2>
+          <h2 id="pilot-form-title">填写出生资料，网页直接生成你的整体档案。</h2>
         </div>
         <button className="pilot-clear" type="button" onClick={clearAll}>
           清空本页资料
@@ -226,13 +270,13 @@ export function PilotIntake() {
       <div className="pilot-handoff" aria-label="获得初步判断的四个步骤">
         <div className="pilot-handoff-head">
           <span>如何获得初步判断</span>
-          <p><b>本页不会自动提交，也不会自动分析。</b>填写完成只是把资料整理成一份可复制的文字包。</p>
+          <p><b>本页会在当前浏览器直接计算。</b>你先看网页生成的完整结构，只有出现具体疑问时再来找均均。</p>
         </div>
         <ol>
-          <li><span>01</span><b>填写出生资料</b><small>第一阶段不填写人生经历。</small></li>
-          <li><span>02</span><b>生成并复制</b><small>点击生成后，复制完整资料包。</small></li>
-          <li><span>03</span><b>私下发给均均</b><small>通过微信或双方约定的私密渠道发送。</small></li>
-          <li><span>04</span><b>收到人工初判</b><small>均均会同时给出第二阶段锁定凭证。</small></li>
+          <li><span>01</span><b>填写出生资料</b><small>先完成日期、时间、地点和必要边界。</small></li>
+          <li><span>02</span><b>网页自动计算</b><small>直接生成四柱、日主和大运结构。</small></li>
+          <li><span>03</span><b>查看整体档案</b><small>结果先留在你的当前浏览器里。</small></li>
+          <li><span>04</span><b>有问题再问均均</b><small>不用每个人都先发送整份资料。</small></li>
         </ol>
       </div>
 
@@ -469,23 +513,47 @@ export function PilotIntake() {
 
           <div className="pilot-generate">
             <button type="button" onClick={buildBirthPacket} disabled={!birthReady}>
-              生成第一阶段资料包
+              生成我的人生档案
             </button>
             {!birthReady && <p>请先完成资格确认、必填信息和本次服务授权。</p>}
           </div>
-          {birthPacket && (
-            <div className="pilot-packet">
+          {chartError && <div className="pilot-error" role="alert">{chartError}</div>}
+          {chartResult && (
+            <div className="pilot-profile" aria-live="polite">
               <div>
-                <span>第一阶段资料包已生成</span>
-                <small>资料目前仍只在你的浏览器里，网站没有收到。</small>
+                <span>你的整体人生档案已生成</span>
+                <small>结果目前只在你的浏览器里，网站没有收到。</small>
               </div>
-              <textarea readOnly value={birthPacket} rows={18} aria-label="第一阶段资料包" />
+              <div className="pilot-profile-status">
+                <b>{chartResult.status === "confirmed_single" ? "单一命盘结果" : chartResult.status === "provisional_single" ? "暂定命盘结果" : "多个候选结果"}</b>
+                <span>{chartResult.warnings[0] || "当前资料已按固定规则完成计算。"}</span>
+              </div>
+              {chartResult.selectedVariant ? (
+                <>
+                  <div className="pilot-pillars" aria-label="四柱结果">
+                    {chartResult.selectedVariant.pillars.map((pillar) => (
+                      <div key={pillar.position}>
+                        <small>{pillar.position === "year" ? "年柱" : pillar.position === "month" ? "月柱" : pillar.position === "day" ? "日柱" : "时柱"}</small>
+                        <strong>{pillar.name}</strong>
+                        <span>{pillar.stemElement} · {pillar.branchElement}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pilot-profile-grid">
+                    <section><span>日主</span><b>{chartResult.selectedVariant.pillars.find((pillar) => pillar.position === "day")?.stem}</b><p>这是结构计算中的日干，不等于完整性格结论。</p></section>
+                    <section><span>起运</span><b>{chartResult.selectedVariant.childLimit.startTime}</b><p>{chartResult.selectedVariant.childLimit.direction === "forward" ? "顺行" : "逆行"} · {chartResult.selectedVariant.childLimit.years}岁{chartResult.selectedVariant.childLimit.months}个月左右</p></section>
+                    <section><span>大运结构</span><b>{chartResult.selectedVariant.childLimit.decadeFortunes.length}步</b><p>{chartResult.selectedVariant.childLimit.decadeFortunes.slice(0, 4).map((fortune) => `${fortune.name} ${fortune.startAge}—${fortune.endAge}岁`).join(" · ")}</p></section>
+                  </div>
+                </>
+              ) : (
+                <div className="pilot-next-action"><b>网页发现时间边界，需要先核对</b><p>当前存在多个候选命盘，系统不会替你强行选一个。你可以先检查出生时间，再决定是否带着这个问题来问均均。</p></div>
+              )}
               <div className="pilot-next-action">
-                <b>现在还差一步：把资料包发给均均</b>
-                <p>先点击复制，再通过微信或双方约定的私密渠道发送。发送后由均均人工排盘并回复初步判断；页面本身不会自动出现反馈。</p>
+                <b>现在不需要把整份资料发给均均</b>
+                <p>先保存或复制网页结果。只有你对某个结构、某段大运或现实问题有具体疑问时，再带着问题来问均均。</p>
               </div>
-              <button type="button" onClick={() => copyPacket(birthPacket, "birth")}>
-                {copied === "birth" ? "已复制，请私下发给均均 ✓" : "复制资料包，下一步发给均均"}
+              <button type="button" onClick={() => copyPacket(chartSummary(), "birth")}>
+                {copied === "birth" ? "人生档案已复制 ✓" : "复制网页生成的完整档案"}
               </button>
             </div>
           )}
@@ -544,7 +612,7 @@ export function PilotIntake() {
           {!lockReady && (
             <div className="pilot-anchors-locked" role="status">
               <b>客观事实锚点暂未开放</b>
-              <p>先把第一阶段资料包发给均均。收到人工初判和三项锁定凭证后，填写上方凭证并确认，这里的输入框才会开放。</p>
+              <p>第二阶段核验功能仍保留给需要参与研究的人。普通用户不需要先走这一步，直接查看网页生成的整体档案即可。</p>
             </div>
           )}
 
@@ -694,7 +762,7 @@ export function PilotIntake() {
       )}
 
       <p className="pilot-local-note">
-        本页没有提交接口，不把填写内容发送给网站服务器，也不会在刷新后恢复。复制资料包后，请通过与均均约定的私密渠道传递。
+        本页没有提交接口，不把填写内容发送给网站服务器，也不会在刷新后恢复。网页会直接在当前浏览器生成结构结果；后续具体问题再找均均。
       </p>
     </section>
   );

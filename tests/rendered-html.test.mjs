@@ -62,7 +62,7 @@ test("pilot route is public and server-renders the intake without a login or inv
 
   const html = await response.text();
   assert.match(html, /无需邀请码|公开体验/);
-  assert.match(html, /先生成资料包，再由均均完成人工初判/);
+  assert.match(html, /填写出生资料，网页直接生成你的整体档案/);
   assert.doesNotMatch(html, /请输入邀请码|name="inviteCode"|ChatGPT 账户登录/);
 });
 
@@ -73,7 +73,7 @@ test("encoded and normalized pilot paths remain public", async () => {
     assert.doesNotMatch(html, /请输入邀请码|INVITE ONLY/, pathname);
     if (pathname !== "/pilot%2fintake") {
       assert.equal(response.status, 200, pathname);
-      assert.match(html, /先生成资料包，再由均均完成人工初判/, pathname);
+      assert.match(html, /填写出生资料，网页直接生成你的整体档案/, pathname);
     } else {
       assert.equal(response.status, 404, pathname);
     }
@@ -85,9 +85,9 @@ test("pilot intake keeps its evidence and privacy boundaries in open mode", asyn
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /公开体验｜四镜人生档案/);
-  assert.match(html, /先生成资料包，再由均均完成人工初判/);
+  assert.match(html, /填写出生资料，网页直接生成你的整体档案/);
   assert.match(html, /如何获得初步判断/);
-  assert.match(html, /本页不会自动提交，也不会自动分析/);
+  assert.match(html, /本页会在当前浏览器直接计算/);
   assert.match(html, /第一阶段/);
   assert.match(html, /收到初步判断后/);
   assert.match(html, /本页没有提交接口/);
@@ -106,7 +106,7 @@ test("removes starter preview code and dependency", async () => {
   assert.match(page, /ConsultationStarter/);
   assert.match(layout, /generateMetadata/);
   assert.match(pilotIntake, /客观事实锚点暂未开放/);
-  assert.match(pilotIntake, /页面本身不会自动出现反馈/);
+  assert.match(pilotIntake, /网页会直接在当前浏览器生成结构结果/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("../package-lock.json", templateRoot)));
