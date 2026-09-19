@@ -60,7 +60,7 @@ export function DesignPreview() {
       "出生地点：" + (birthPlace || "待补充"),
       "关注主题：" + topics.find((item) => item.id === topic)?.label,
       "当前问题：" + (question || prompts[topic]),
-      "说明：此体验只整理输入，不生成命理解读；资料未上传。",
+      "说明：此页面自动整理为人生档案初稿，不生成未经核验的命理解读；资料未上传。",
     ].join("\n");
     try {
       await navigator.clipboard.writeText(draft);
@@ -161,19 +161,31 @@ export function DesignPreview() {
             </form>
           ) : (
             <div className={styles.resultCard} aria-live="polite">
-              <div className={styles.resultTop}><span>体验草稿已生成</span><b>本地 · 不上传</b></div>
-              <h2>{topics.find((item) => item.id === topic)?.label}</h2>
-              <p className={styles.resultQuestion}>“{question.trim() || prompts[topic]}”</p>
-              <div className={styles.resultFacts}>
-                <span>出生日期 <b>{birthDate}</b></span>
-                <span>出生时间 <b>{birthTime || "待确认"}</b></span>
-                <span>出生地点 <b>{birthPlace}</b></span>
+              <div className={styles.resultTop}><span>人生档案初稿已生成</span><b>本地 · 不上传</b></div>
+              <h2>你的整体资料总览</h2>
+              <p className={styles.resultQuestion}>先自己看懂资料全貌；后续如果有具体问题，再单独来问均均。</p>
+              <div className={styles.profileSections}>
+                <section>
+                  <span>基本信息</span>
+                  <strong>{birthDate} · {birthPlace}</strong>
+                  <p>出生时间：{birthTime || "暂未确认，可之后补充"}</p>
+                </section>
+                <section>
+                  <span>当前关注</span>
+                  <strong>{topics.find((item) => item.id === topic)?.label}</strong>
+                  <p>{question.trim() || prompts[topic]}</p>
+                </section>
+                <section>
+                  <span>资料完整度</span>
+                  <strong>{birthTime ? "基础资料已齐" : "还差出生时间"}</strong>
+                  <p>{birthTime ? "可以进入事实核验和具体问题整理。" : "出生时间不确定也可以先保留，不需要为了填表猜一个时间。"}</p>
+                </section>
               </div>
               <div className={styles.nextStep}>
-                <strong>真实会诊的下一步</strong>
-                <p>先核对出生信息和时间误差；再在不看人生经历的情况下写下判断；最后逐条核对事实，不只记录“命中”。</p>
+                <strong>接下来你可以自己做什么</strong>
+                <p>先保存或复制这份总览，想清楚一个最具体的问题。只有需要进一步判断、核对或追问时，再把问题带来，不必每次都重新整理整套资料。</p>
               </div>
-              <button className={styles.submitButton} type="button" onClick={copyDraft}>{copied ? "体验卡已复制 ✓" : "复制这张体验卡"}</button>
+              <button className={styles.submitButton} type="button" onClick={copyDraft}>{copied ? "人生档案已复制 ✓" : "复制这份人生档案"}</button>
               <button className={styles.editButton} type="button" onClick={() => setSubmitted(false)}>返回修改资料</button>
             </div>
           )}
