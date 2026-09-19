@@ -128,7 +128,7 @@ export function PilotIntake() {
         ? "前瞻样本候选"
         : "需要人工评估信息污染；可能转为回顾性样本";
     const packet = [
-      "【封闭内测｜第一阶段出生资料包】",
+      "【公开体验｜第一阶段出生资料包】",
       "表单版本：pilot-v0",
       "重要声明：本资料包不含人生经历；尚未形成盲断结论。",
       "",
@@ -168,7 +168,7 @@ export function PilotIntake() {
       `证据情况：${anchor.evidence}`,
     ]);
     const packet = [
-      "【封闭内测｜第二阶段事实资料包】",
+      "【公开体验｜第二阶段事实资料包】",
       "表单版本：pilot-v0",
       `案例编号：${lock.caseId.trim()}`,
       `盲断锁定编号：${lock.lockId.trim()}`,

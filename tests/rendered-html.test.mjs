@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const templateRoot = new URL("../", import.meta.url);
-
-const pilotInviteCode = "JUNJUN-TEST-ACCESS";
 
 async function render(pathname = "/", init = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -19,7 +16,6 @@ async function render(pathname = "/", init = {}) {
     }),
     {
       ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
-      PILOT_INVITE_CODE: pilotInviteCode,
     },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -32,12 +28,18 @@ test("server-renders the finished consultation site", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>四派人生档案会诊｜先盲断，再核验<\/title>/);
-  assert.match(html, /不急着告诉你答案/);
-  assert.match(html, /结构轴/);
-  assert.match(html, /环境轴/);
-  assert.match(html, /气机轴/);
-  assert.match(html, /事件轴/);
-  assert.match(html, /隐私默认不留存/);
+  assert.match(html, /从一个问题开始/);
+  assert.match(html, /建立你的人生档案/);
+  assert.match(html, /档案编辑部/);
+  assert.match(html, /命盘研究室/);
+  assert.match(html, /当代东方/);
+  assert.match(html, /出生地点/);
+  assert.match(html, /生成我的体验卡/);
+  assert.match(html, /结构/);
+  assert.match(html, /环境/);
+  assert.match(html, /气机/);
+  assert.match(html, /事件/);
+  assert.match(html, /不会上传/);
   assert.match(html, /http:\/\/localhost\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
@@ -52,108 +54,37 @@ test("metadata does not trust an arbitrary Host header", async () => {
   assert.match(html, /https:\/\/example\.invalid\/og\.png/);
 });
 
-test("pilot route shows the invite gate without an access cookie", async () => {
+test("pilot route is public and server-renders the intake without a login or invite", async () => {
   const response = await render("/pilot");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 
   const html = await response.text();
-  assert.match(html, /请输入邀请人/);
-  assert.match(html, /name="inviteCode"/);
-  assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/);
+  assert.match(html, /无需邀请码|公开体验/);
+  assert.match(html, /先生成资料包，再由均均完成人工初判/);
+  assert.doesNotMatch(html, /请输入邀请码|name="inviteCode"|ChatGPT 账户登录/);
 });
 
-test("encoded and normalized pilot paths cannot bypass the invite gate", async () => {
+test("encoded and normalized pilot paths remain public", async () => {
   for (const pathname of ["/%70ilot", "/p%69lot", "/pilot%2fintake", "/x/../pilot"]) {
     const response = await render(pathname);
-    assert.equal(response.status, 200, pathname);
     const html = await response.text();
-    assert.match(html, /请输入邀请人/, pathname);
-    assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/, pathname);
+    assert.doesNotMatch(html, /请输入邀请码|INVITE ONLY/, pathname);
+    if (pathname !== "/pilot%2fintake") {
+      assert.equal(response.status, 200, pathname);
+      assert.match(html, /先生成资料包，再由均均完成人工初判/, pathname);
+    } else {
+      assert.equal(response.status, 404, pathname);
+    }
   }
 });
 
-test("pilot route rejects an incorrect invite code", async () => {
-  const response = await render("/pilot", {
-    method: "POST",
-    headers: {
-      accept: "text/html",
-      "content-type": "application/x-www-form-urlencoded",
-      host: "localhost",
-    },
-    body: new URLSearchParams({ inviteCode: "WRONG-CODE" }),
-  });
-  assert.equal(response.status, 401);
-  assert.match(await response.text(), /邀请码不正确/);
-  assert.equal(response.headers.get("set-cookie"), null);
-});
-
-test("pilot gate rejects unsupported or oversized request bodies before parsing", async () => {
-  const unsupported = await render("/pilot", {
-    method: "POST",
-    headers: { "content-type": "application/json", host: "localhost" },
-    body: JSON.stringify({ inviteCode: pilotInviteCode }),
-  });
-  assert.equal(unsupported.status, 415);
-  assert.equal(unsupported.headers.get("set-cookie"), null);
-
-  const oversized = await render("/pilot", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", host: "localhost" },
-    body: new URLSearchParams({ inviteCode: "X".repeat(2048) }),
-  });
-  assert.equal(oversized.status, 413);
-  assert.equal(oversized.headers.get("set-cookie"), null);
-});
-
-test("pilot access token has a server-verified expiry", async () => {
-  const expiredAt = Math.floor(Date.now() / 1000) - 1;
-  const signature = createHmac("sha256", pilotInviteCode)
-    .update(`pilot-access-v2:${expiredAt}`)
-    .digest("hex");
-  const response = await render("/pilot", {
-    headers: {
-      accept: "text/html",
-      cookie: `pilot_access=${expiredAt}.${signature}`,
-      host: "localhost",
-    },
-  });
+test("pilot intake keeps its evidence and privacy boundaries in open mode", async () => {
+  const response = await render("/pilot");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /请输入邀请人/);
-  assert.doesNotMatch(html, /先生成资料包，再由均均完成人工初判/);
-});
-
-test("pilot route accepts the invite code and server-renders the intake", async () => {
-  const unlockResponse = await render("/pilot", {
-    method: "POST",
-    headers: {
-      accept: "text/html",
-      "content-type": "application/x-www-form-urlencoded",
-      host: "localhost",
-    },
-    body: new URLSearchParams({ inviteCode: pilotInviteCode }),
-  });
-  assert.equal(unlockResponse.status, 303);
-  assert.equal(unlockResponse.headers.get("location"), "/pilot");
-  const cookie = unlockResponse.headers.get("set-cookie");
-  assert.match(cookie ?? "", /^pilot_access=\d{10}\.[a-f0-9]{64};/);
-  assert.match(cookie ?? "", /HttpOnly/);
-  assert.match(cookie ?? "", /SameSite=Lax/);
-
-  const response = await render("/pilot", {
-    headers: {
-      accept: "text/html",
-      cookie: cookie?.split(";")[0] ?? "",
-      host: "localhost",
-    },
-  });
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.equal(response.headers.get("cache-control"), "private, no-store");
-
-  const html = await response.text();
-  assert.match(html, /首批封闭内测｜四派人生档案会诊/);
+  assert.match(html, /公开体验｜四派人生档案会诊/);
   assert.match(html, /先生成资料包，再由均均完成人工初判/);
   assert.match(html, /如何获得初步判断/);
   assert.match(html, /本页不会自动提交，也不会自动分析/);

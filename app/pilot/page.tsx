@@ -3,8 +3,8 @@ import Link from "next/link";
 import { PilotIntake } from "./PilotIntake";
 
 export const metadata: Metadata = {
-  title: "首批封闭内测｜四派人生档案会诊",
-  description: "先提交出生资料，锁定首轮判断，再补充人生事实。首批8—12例封闭验证，不承诺准确率。",
+  title: "公开体验｜四派人生档案会诊",
+  description: "无需邀请码或账号。先提交出生资料，锁定首轮判断，再补充人生事实；资料仅在本机生成。",
 };
 
 const process = [
@@ -22,7 +22,7 @@ export default function PilotPage() {
           <span className="brand-seal">四</span>
           <span>
             <strong>人生档案会诊</strong>
-            <small>封闭内测 · PILOT V0</small>
+            <small>公开体验 · PILOT V0</small>
           </span>
         </Link>
         <nav aria-label="内测页导航">
@@ -34,10 +34,10 @@ export default function PilotPage() {
 
       <section className="pilot-hero" id="top">
         <div className="pilot-hero-copy">
-          <p className="eyebrow"><span /> 首批 8—12 例 · 邀请制</p>
+          <p className="eyebrow"><span /> 无需邀请码 · 无需账号</p>
           <h1>不是来证明“很准”，<br /><em>是来检查哪里会错。</em></h1>
           <p>
-            第一批封闭内测采用两阶段流程：先交出生资料，等首轮判断锁定后，再交真实经历。命中、冲突和不知道都会留下。
+            公开体验采用两阶段流程：先交出生资料，等首轮判断锁定后，再交真实经历。命中、冲突和不知道都会留下。
           </p>
           <div className="hero-actions">
             <a className="button button-primary" href="#intake">进入两阶段资料台 <span>↓</span></a>
@@ -46,14 +46,14 @@ export default function PilotPage() {
         </div>
         <aside className="pilot-hero-card">
           <span>本轮目标</span>
-          <strong>建立第一批<br />可反证样本</strong>
+          <strong>让流程公开<br />接受真实检验</strong>
           <ul>
             <li>不提前收人生经历</li>
             <li>不只保留“命中”</li>
             <li>不公开真实身份</li>
             <li>不宣传未经证明的准确率</li>
           </ul>
-          <small>当前为人工封闭流程，不是自动算命工具。</small>
+          <small>当前为人工研究流程，不是自动算命工具。</small>
         </aside>
       </section>
 
