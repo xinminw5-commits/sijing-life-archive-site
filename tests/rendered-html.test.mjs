@@ -27,7 +27,7 @@ test("server-renders the finished consultation site", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>四派人生档案会诊｜先盲断，再核验<\/title>/);
+  assert.match(html, /<title>四镜人生档案｜先盲断，再核验<\/title>/);
   assert.match(html, /从一个问题开始/);
   assert.match(html, /建立你的人生档案/);
   assert.match(html, /档案编辑部/);
@@ -84,7 +84,7 @@ test("pilot intake keeps its evidence and privacy boundaries in open mode", asyn
   const response = await render("/pilot");
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /公开体验｜四派人生档案会诊/);
+  assert.match(html, /公开体验｜四镜人生档案/);
   assert.match(html, /先生成资料包，再由均均完成人工初判/);
   assert.match(html, /如何获得初步判断/);
   assert.match(html, /本页不会自动提交，也不会自动分析/);

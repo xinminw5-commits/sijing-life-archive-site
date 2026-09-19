@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PilotIntake } from "./PilotIntake";
 
 export const metadata: Metadata = {
-  title: "公开体验｜四派人生档案会诊",
+  title: "公开体验｜四镜人生档案",
   description: "无需邀请码或账号。先提交出生资料，锁定首轮判断，再补充人生事实；资料仅在本机生成。",
 };
 
@@ -18,10 +18,10 @@ export default function PilotPage() {
   return (
     <main className="pilot-page">
       <header className="site-header pilot-header">
-        <Link className="brand" href="/" aria-label="返回四派人生档案会诊首页">
+        <Link className="brand" href="/" aria-label="返回四镜人生档案首页">
           <span className="brand-seal">四</span>
           <span>
-            <strong>人生档案会诊</strong>
+            <strong>四镜人生档案</strong>
             <small>公开体验 · PILOT V0</small>
           </span>
         </Link>
@@ -125,7 +125,7 @@ export default function PilotPage() {
       <footer>
         <Link className="brand footer-brand" href="/">
           <span className="brand-seal">四</span>
-          <span><strong>人生档案会诊</strong><small>先盲断 · 后核验</small></span>
+          <span><strong>四镜人生档案</strong><small>先盲断 · 后核验</small></span>
         </Link>
         <p>参与不是认可结论；冲突与退出同样会被记录。</p>
         <a href="#top">回到顶部 ↑</a>

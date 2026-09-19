@@ -54,7 +54,7 @@ export function DesignPreview() {
 
   async function copyDraft() {
     const draft = [
-      "四派人生档案｜体验草稿",
+      "四镜人生档案｜体验草稿",
       "出生日期：" + (birthDate || "待补充"),
       "出生时间：" + (birthTime || "不确定 / 待补充"),
       "出生地点：" + (birthPlace || "待补充"),
@@ -74,9 +74,9 @@ export function DesignPreview() {
   return (
     <main className={styles.page + " " + styles["theme_" + direction]}>
       <header className={styles.topbar}>
-        <a className={styles.brand} href="#top" aria-label="四派人生档案首页">
+        <a className={styles.brand} href="#top" aria-label="四镜人生档案首页">
           <span className={styles.brandMark}>四</span>
-          <span><strong>人生档案</strong><small>FOUR-LENS LIFE ARCHIVE</small></span>
+          <span><strong>四镜人生档案</strong><small>FOUR-LENS ARCHIVE</small></span>
         </a>
         <div className={styles.topbarNote}><span className={styles.liveDot} /> 可先试填 · 无需登录</div>
       </header>
@@ -189,7 +189,7 @@ export function DesignPreview() {
       </section>
 
       <footer className={styles.footer}>
-        <span>四派人生档案会诊</span>
+        <span>四镜人生档案</span>
         <span>先盲断 · 后核验 · 允许被推翻</span>
         <a href="/pilot">进入完整资料流程 ↗</a>
       </footer>

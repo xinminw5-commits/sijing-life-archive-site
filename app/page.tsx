@@ -68,11 +68,11 @@ export default function Home() {
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="四派人生档案会诊首页">
+        <a className="brand" href="#top" aria-label="四镜人生档案首页">
           <span className="brand-seal">四</span>
           <span>
             <strong>人生档案会诊</strong>
-            <small>FOUR-LENS LIFE ARCHIVE</small>
+            <small>FOUR-LENS ARCHIVE</small>
           </span>
         </a>
         <nav aria-label="主导航">
@@ -87,7 +87,7 @@ export default function Home() {
       <section className="hero" id="top">
         <div className="hero-grain" aria-hidden="true" />
         <div className="hero-copy">
-          <p className="eyebrow"><span /> 四派人生档案会诊</p>
+          <p className="eyebrow"><span /> 四镜人生档案</p>
           <h1>
             不急着告诉你答案，
             <em>先把判断留在经历之前。</em>
@@ -278,7 +278,7 @@ export default function Home() {
       <footer>
         <a className="brand footer-brand" href="#top">
           <span className="brand-seal">四</span>
-          <span><strong>人生档案会诊</strong><small>有根 · 有证 · 有反思</small></span>
+          <span><strong>四镜人生档案</strong><small>有根 · 有证 · 有反思</small></span>
         </a>
         <p>命理用于观察与对话，不替代个人选择和现实行动。</p>
         <a href="#top">回到顶部 ↑</a>
