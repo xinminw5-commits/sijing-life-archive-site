@@ -41,6 +41,9 @@ export function PilotIntake() {
   const [copied, setCopied] = useState<"birth" | "facts" | null>(null);
   const [chartResult, setChartResult] = useState<DeterministicChartResult | null>(null);
   const [chartError, setChartError] = useState("");
+  const [analysis, setAnalysis] = useState("");
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
   const [factsPacket, setFactsPacket] = useState("");
   const [eligible, setEligible] = useState({
     adult: false,
@@ -113,6 +116,8 @@ export function PilotIntake() {
     setBirth((current) => ({ ...current, [key]: value }));
     setChartResult(null);
     setChartError("");
+    setAnalysis("");
+    setAnalysisError("");
   }
 
   function updateLock<K extends keyof typeof lock>(key: K, value: (typeof lock)[K]) {
@@ -174,9 +179,39 @@ export function PilotIntake() {
       });
       setChartResult(result);
       setChartError("");
+      void requestAnalysis(result);
     } catch (error) {
       setChartResult(null);
       setChartError(error instanceof ChartCalculationError ? error.message : "这组出生资料暂时无法计算，请检查日期和时间格式。");
+    }
+  }
+
+  async function requestAnalysis(result: DeterministicChartResult) {
+    setAnalysis("");
+    setAnalysisError("");
+    setAnalysisLoading(true);
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          birth: {
+            date: birth.date.trim(),
+            time: birth.time.trim(),
+            place: birth.place.trim(),
+            gender: birth.genderMarker,
+            focus: birth.focus.trim() || "整体人生结构、事业、关系和当前阶段",
+          },
+          chart: result,
+        }),
+      });
+      const payload = (await response.json()) as { report?: string; error?: string };
+      if (!response.ok || !payload.report) throw new Error(payload.error || "报告暂时无法生成。");
+      setAnalysis(payload.report);
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "报告暂时无法生成，请稍后重试。");
+    } finally {
+      setAnalysisLoading(false);
     }
   }
 
@@ -252,6 +287,8 @@ export function PilotIntake() {
     setFactsPacket("");
     setChartResult(null);
     setChartError("");
+    setAnalysis("");
+    setAnalysisError("");
     setCopied(null);
   }
 
@@ -475,6 +512,15 @@ export function PilotIntake() {
                 rows={3}
               />
             </label>
+            <label className="pilot-span-two">
+              <span>你最想了解什么？ <small>可选，不写也会生成整体报告</small></span>
+              <textarea
+                value={birth.focus}
+                onChange={(event) => updateBirth("focus", event.target.value)}
+                placeholder="例如：我想了解自己的性格底色、事业方向、关系模式和现在最重要的课题。"
+                rows={3}
+              />
+            </label>
           </div>
 
           <div className="pilot-panel-intro">
@@ -548,6 +594,12 @@ export function PilotIntake() {
               ) : (
                 <div className="pilot-next-action"><b>网页发现时间边界，需要先核对</b><p>当前存在多个候选命盘，系统不会替你强行选一个。你可以先检查出生时间，再决定是否带着这个问题来问均均。</p></div>
               )}
+              <section className="pilot-analysis" aria-label="AI 自动断盘报告">
+                <div className="pilot-analysis-head"><b>通俗版整体断盘</b><span>{analysisLoading ? "正在生成报告…" : analysis ? "已生成" : "等待生成"}</span></div>
+                {analysisLoading && <p className="pilot-analysis-loading">正在把排盘结构翻译成普通人能看懂的语言，请稍候。</p>}
+                {analysisError && <p className="pilot-error">{analysisError} 如果你刚发布新版，可能还需要管理员配置分析服务。</p>}
+                {analysis && <div className="pilot-analysis-body">{analysis}</div>}
+              </section>
               <div className="pilot-next-action">
                 <b>现在不需要把整份资料发给均均</b>
                 <p>先保存或复制网页结果。只有你对某个结构、某段大运或现实问题有具体疑问时，再带着问题来问均均。</p>
