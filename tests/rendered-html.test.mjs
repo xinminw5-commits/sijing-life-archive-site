@@ -89,8 +89,8 @@ test("pilot intake keeps its evidence and privacy boundaries in open mode", asyn
   assert.match(html, /如何获得初步判断/);
   assert.match(html, /本页会在当前浏览器直接计算/);
   assert.match(html, /第一阶段/);
-  assert.match(html, /收到初步判断后/);
-  assert.match(html, /本页没有提交接口/);
+  assert.match(html, /可选核验/);
+  assert.match(html, /出生资料仅用于本次排盘和 DeepSeek 报告生成/);
   assert.match(html, /匿名内部研究（可选）/);
   assert.doesNotMatch(html, /真实姓名|手机号码|微信号/);
 });
@@ -106,7 +106,7 @@ test("removes starter preview code and dependency", async () => {
   assert.match(page, /ConsultationStarter/);
   assert.match(layout, /generateMetadata/);
   assert.match(pilotIntake, /客观事实锚点暂未开放/);
-  assert.match(pilotIntake, /网页会直接在当前浏览器生成结构结果/);
+  assert.match(pilotIntake, /renderAnalysis/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("../package-lock.json", templateRoot)));

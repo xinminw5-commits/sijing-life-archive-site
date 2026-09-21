@@ -4,7 +4,7 @@ import { PilotIntake } from "./PilotIntake";
 
 export const metadata: Metadata = {
   title: "公开体验｜四镜人生档案",
-  description: "无需邀请码或账号。先提交出生资料，锁定首轮判断，再补充人生事实；资料仅在本机生成。",
+  description: "无需邀请码或账号。填写一次出生资料，网页自动生成结构化排盘和普通人看得懂的整体断盘报告。",
 };
 
 const process = [
@@ -28,19 +28,19 @@ export default function PilotPage() {
         <nav aria-label="内测页导航">
           <a href="#how">流程</a>
           <a href="#criteria">入选条件</a>
-          <a className="nav-cta" href="#intake">填写资料</a>
+            <a className="nav-cta" href="#intake">开始填写</a>
         </nav>
       </header>
 
       <section className="pilot-hero" id="top">
         <div className="pilot-hero-copy">
           <p className="eyebrow"><span /> 无需邀请码 · 无需账号</p>
-          <h1>不是来证明“很准”，<br /><em>是来检查哪里会错。</em></h1>
+            <h1>填写一次资料，<br /><em>直接看懂自己。</em></h1>
           <p>
-            公开体验采用两阶段流程：先交出生资料，等首轮判断锁定后，再交真实经历。命中、冲突和不知道都会留下。
+            先填写出生资料，网页会自动生成一份普通人看得懂的整体断盘报告；只有想继续追问时，再来找均均。
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#intake">进入两阶段资料台 <span>↓</span></a>
+            <a className="button button-primary" href="#intake">开始填写资料 <span>↓</span></a>
             <Link className="text-link" href="/">返回服务介绍 <span>↗</span></Link>
           </div>
         </div>
@@ -60,10 +60,10 @@ export default function PilotPage() {
       <section className="pilot-process" id="how">
         <div className="section-heading split-heading">
           <div>
-            <p className="eyebrow"><span /> 为什么分两次</p>
-            <h2>先锁答案，<br />再让事实进场。</h2>
+            <p className="eyebrow"><span /> 使用方式</p>
+            <h2>填写一次，<br />先看懂整体。</h2>
           </div>
-          <p>如果先看到人生经历，后来再说“命盘早已显示”，就无法区分事前判断与事后解释。两阶段不是仪式，而是最低证据门槛。</p>
+          <p>网页先根据出生资料生成整体档案和通俗说明，不要求你先整理人生经历。只有报告里出现具体疑问时，再带着问题来咨询。</p>
         </div>
         <ol>
           {process.map(([number, title, body]) => (
@@ -78,8 +78,8 @@ export default function PilotPage() {
 
       <section className="pilot-criteria" id="criteria">
         <div>
-          <p className="eyebrow light"><span /> 适合参加</p>
-          <h2>时间可以不完美，<br />但来源必须诚实。</h2>
+          <p className="eyebrow light"><span /> 使用边界</p>
+          <h2>可以不懂命理，<br />但请如实填写。</h2>
         </div>
         <div className="pilot-criteria-grid">
           <article>
@@ -115,7 +115,7 @@ export default function PilotPage() {
           <h2>当前先把流程跑真，<br />不把功能装完整。</h2>
         </div>
         <div className="boundary-grid">
-          <p><b>本页不上传资料</b>所有内容只在当前页面内生成，由参与者主动复制。</p>
+          <p><b>只为生成本次报告</b>出生资料会发送给 DeepSeek，网站不建立长期个人档案。</p>
           <p><b>三种授权分开</b>完成服务、匿名研究、公开展示分别选择，后两项默认关闭。</p>
           <p><b>高风险问题中止</b>医疗、法律、重大财务及人身安全问题回到现实专业支持。</p>
           <p><b>首批不计算准确率</b>8—12例用于发现流程和规则问题，不能证明整体有效。</p>

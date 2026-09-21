@@ -36,6 +36,33 @@ function parseTime(value: string) {
   return { hour, minute };
 }
 
+function renderAnalysis(report: string) {
+  const sections: Array<{ title: string; body: string[] }> = [];
+  let current: { title: string; body: string[] } | null = null;
+
+  report.split(/\r?\n/).forEach((line) => {
+    const match = line.trim().match(/^(?:#{1,4}\s*)?(?:\d+[、.)]\s*)?(整体底色|优势与可用能力|容易卡住的地方|事业与财务|关系与边界|阶段节奏|当前建议|需要现实验证的部分|继续追问)\s*[:：]?\s*(.*)$/);
+    if (match) {
+      current = { title: match[1], body: match[2] ? [match[2]] : [] };
+      sections.push(current);
+    } else if (current) {
+      current.body.push(line);
+    }
+  });
+
+  if (!sections.length) return <div className="pilot-analysis-plain">{report}</div>;
+  return (
+    <div className="pilot-report-grid">
+      {sections.map((section) => (
+        <article className="pilot-report-section" key={section.title}>
+          <h3>{section.title}</h3>
+          <div>{section.body.join("\n").trim()}</div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export function PilotIntake() {
   const [stage, setStage] = useState<IntakeStage>("birth");
   const [copied, setCopied] = useState<"birth" | "facts" | null>(null);
@@ -52,17 +79,18 @@ export function PilotIntake() {
   });
   const [birth, setBirth] = useState({
     alias: "",
-    calendar: "",
+    calendar: "公历",
     date: "",
     time: "",
-    source: "",
+    source: "S1｜父母或直接知情人稳定回忆",
     sourceNote: "",
-    precision: "",
+    precision: "P2｜误差约30—120分钟",
     place: "",
     timezone: "中国标准时间（UTC+8）",
     genderMarker: "",
-    familiarity: "",
+    familiarity: "完全不了解",
     knownContext: "",
+    focus: "",
     serviceConsent: false,
     researchConsent: false,
     publicConsent: false,
@@ -81,17 +109,14 @@ export function PilotIntake() {
   const [background, setBackground] = useState("");
   const [factsConsent, setFactsConsent] = useState(false);
 
-  const eligibleReady = eligible.adult && eligible.timeSource && eligible.followup;
+  const eligibleReady = true;
   const birthReady =
     eligibleReady &&
     birth.date.trim() &&
     birth.time.trim() &&
     birth.calendar &&
-    birth.source &&
-    birth.precision &&
     birth.place.trim() &&
     birth.genderMarker &&
-    birth.familiarity &&
     birth.serviceConsent;
   const lockReady =
     lock.caseId.trim() &&
@@ -265,17 +290,18 @@ export function PilotIntake() {
     setEligible({ adult: false, timeSource: false, followup: false });
     setBirth({
       alias: "",
-      calendar: "",
+      calendar: "公历",
       date: "",
       time: "",
-      source: "",
+      source: "S1｜父母或直接知情人稳定回忆",
       sourceNote: "",
-      precision: "",
+      precision: "P2｜误差约30—120分钟",
       place: "",
       timezone: "中国标准时间（UTC+8）",
       genderMarker: "",
-      familiarity: "",
+      familiarity: "完全不了解",
       knownContext: "",
+      focus: "",
       serviceConsent: false,
       researchConsent: false,
       publicConsent: false,
@@ -296,7 +322,7 @@ export function PilotIntake() {
     <section className="pilot-workbench" aria-labelledby="pilot-form-title">
       <div className="pilot-workbench-head">
         <div>
-          <p className="eyebrow"><span /> 两阶段资料台</p>
+          <p className="eyebrow"><span /> 自助档案生成</p>
           <h2 id="pilot-form-title">填写出生资料，网页直接生成你的整体档案。</h2>
         </div>
         <button className="pilot-clear" type="button" onClick={clearAll}>
@@ -335,8 +361,8 @@ export function PilotIntake() {
           className={stage === "facts" ? "active" : ""}
           onClick={() => setStage("facts")}
         >
-          <span>第二阶段</span>
-          收到初步判断后
+          <span>高级研究</span>
+          可选核验
         </button>
       </div>
 
@@ -345,11 +371,11 @@ export function PilotIntake() {
           <div className="pilot-panel-intro">
             <span className="pilot-index">A</span>
             <div>
-              <h3>资格确认</h3>
-              <p>这一阶段禁止填写家庭、学业、工作、关系和迁移经历。</p>
+              <h3>开始填写</h3>
+              <p>普通用户只需要填写出生日期、时间、地点和性别；网页会自动生成完整报告。</p>
             </div>
           </div>
-          <div className="pilot-check-grid">
+          <div className="pilot-check-grid pilot-research-gate">
             <label>
               <input
                 type="checkbox"
@@ -413,20 +439,22 @@ export function PilotIntake() {
             <label>
               <span>出生日期 *</span>
               <input
+                type="date"
                 value={birth.date}
                 onChange={(event) => updateBirth("date", event.target.value)}
-                placeholder="按所选日历填写，如 1995-08-16"
+                aria-label="出生日期"
               />
             </label>
             <label>
               <span>出生时间 *</span>
               <input
+                type="time"
                 value={birth.time}
                 onChange={(event) => updateBirth("time", event.target.value)}
-                placeholder="如 14:35；不知道分钟可写约14点"
+                aria-label="出生时间"
               />
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <span>时间来源 *</span>
               <select
                 value={birth.source}
@@ -439,7 +467,7 @@ export function PilotIntake() {
                 <option>S0｜来源不明或后期推测</option>
               </select>
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <span>时间精度 *</span>
               <select
                 value={birth.precision}
@@ -452,7 +480,7 @@ export function PilotIntake() {
                 <option>P0｜完全不知道</option>
               </select>
             </label>
-            <label className="pilot-span-two">
+            <label className="pilot-span-two pilot-advanced-field">
               <span>来源补充 <small>可选</small></span>
               <input
                 value={birth.sourceNote}
@@ -468,7 +496,7 @@ export function PilotIntake() {
                 placeholder="不填写医院、街道或门牌"
               />
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <span>时区或历史时制 *</span>
               <select
                 value={birth.timezone}
@@ -491,7 +519,7 @@ export function PilotIntake() {
                 <option>暂不提供，先确认是否影响排盘</option>
               </select>
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <span>分析者了解你的经历吗？ *</span>
               <select
                 value={birth.familiarity}
@@ -503,7 +531,7 @@ export function PilotIntake() {
                 <option>比较熟悉我的经历</option>
               </select>
             </label>
-            <label className="pilot-span-two">
+            <label className="pilot-span-two pilot-advanced-field">
               <span>已知上下文边界 <small>只写分析者已经知道什么，不写答案</small></span>
               <textarea
                 value={birth.knownContext}
@@ -512,7 +540,7 @@ export function PilotIntake() {
                 rows={3}
               />
             </label>
-            <label className="pilot-span-two">
+            <label className="pilot-span-two pilot-advanced-field">
               <span>你最想了解什么？ <small>可选，不写也会生成整体报告</small></span>
               <textarea
                 value={birth.focus}
@@ -526,8 +554,8 @@ export function PilotIntake() {
           <div className="pilot-panel-intro">
             <span className="pilot-index">C</span>
             <div>
-              <h3>分开授权</h3>
-              <p>研究与公开展示默认关闭，也不能作为参加基础内测的交换条件。</p>
+              <h3>生成报告</h3>
+              <p>只需同意将本次出生资料发送给 DeepSeek 生成报告，网站不建立长期个人档案。</p>
             </div>
           </div>
           <div className="pilot-consents">
@@ -537,9 +565,9 @@ export function PilotIntake() {
                 checked={birth.serviceConsent}
                 onChange={(event) => updateBirth("serviceConsent", event.target.checked)}
               />
-              <span><b>本次内测所需处理 *</b>同意均均为本次排盘、盲断、核验和回访处理上述资料。</span>
+              <span><b>本次报告所需处理 *</b>同意将出生资料发送给 DeepSeek，仅用于生成本次报告；网站不建立长期个人档案。</span>
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <input
                 type="checkbox"
                 checked={birth.researchConsent}
@@ -547,7 +575,7 @@ export function PilotIntake() {
               />
               <span><b>匿名内部研究（可选）</b>同意去标识化后用于规则复核；不同意不影响服务。</span>
             </label>
-            <label>
+            <label className="pilot-advanced-field">
               <input
                 type="checkbox"
                 checked={birth.publicConsent}
@@ -568,7 +596,7 @@ export function PilotIntake() {
             <div className="pilot-profile" aria-live="polite">
               <div>
                 <span>你的整体人生档案已生成</span>
-                <small>结果目前只在你的浏览器里，网站没有收到。</small>
+                <small>出生资料仅发送给 DeepSeek 生成本次报告，网站不保存个人档案。</small>
               </div>
               <div className="pilot-profile-status">
                 <b>{chartResult.status === "confirmed_single" ? "单一命盘结果" : chartResult.status === "provisional_single" ? "暂定命盘结果" : "多个候选结果"}</b>
@@ -598,7 +626,7 @@ export function PilotIntake() {
                 <div className="pilot-analysis-head"><b>通俗版整体断盘</b><span>{analysisLoading ? "正在生成报告…" : analysis ? "已生成" : "等待生成"}</span></div>
                 {analysisLoading && <p className="pilot-analysis-loading">正在把排盘结构翻译成普通人能看懂的语言，请稍候。</p>}
                 {analysisError && <p className="pilot-error">{analysisError} 如果你刚发布新版，可能还需要管理员配置分析服务。</p>}
-                {analysis && <div className="pilot-analysis-body">{analysis}</div>}
+                {analysis && <div className="pilot-analysis-body">{renderAnalysis(analysis)}</div>}
               </section>
               <div className="pilot-next-action">
                 <b>现在不需要把整份资料发给均均</b>
@@ -814,7 +842,7 @@ export function PilotIntake() {
       )}
 
       <p className="pilot-local-note">
-        本页没有提交接口，不把填写内容发送给网站服务器，也不会在刷新后恢复。网页会直接在当前浏览器生成结构结果；后续具体问题再找均均。
+        出生资料仅用于本次排盘和 DeepSeek 报告生成，不建立长期个人档案。网页生成结果只保留在当前浏览器；有具体问题时，再带着问题来找均均。
       </p>
     </section>
   );

@@ -660,6 +660,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .pilot-panel-intro h3 { margin: 0; font-family: var(--serif); font-size: 22px; font-weight: 600; }
 .pilot-panel-intro p { margin: 7px 0 0; color: var(--ink-soft); font-size: 11px; line-height: 1.7; }
 .pilot-check-grid, .pilot-consents { display: grid; gap: 10px; margin-bottom: 38px; }
+.pilot-research-gate, .pilot-advanced-field { display: none; }
 .pilot-check-grid label, .pilot-consents label, .pilot-lock-confirm {
   display: grid;
   grid-template-columns: 22px 1fr;
@@ -772,6 +773,23 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .pilot-profile-grid span { display: block; }
 .pilot-profile-grid b { display: block; margin-top: 5px; color: var(--ink); font-size: 15px; }
 .pilot-profile-grid p { margin: 5px 0 0; color: var(--ink-soft); font-size: 10px; line-height: 1.65; }
+.pilot-analysis {
+  display: grid;
+  gap: 16px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(24, 63, 58, .18);
+}
+.pilot-analysis-head { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
+.pilot-analysis-head b { color: var(--teal); font-family: var(--serif); font-size: 20px; }
+.pilot-analysis-head span { color: #777f7a; font-size: 10px; }
+.pilot-analysis-loading { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.8; }
+.pilot-analysis-body { color: var(--ink-soft); font-size: 12px; line-height: 1.9; }
+.pilot-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pilot-report-section { padding: 18px; border: 1px solid var(--line); background: #fffdf8; }
+.pilot-report-section:first-child { grid-column: 1 / -1; background: #f5f0e7; }
+.pilot-report-section h3 { margin: 0 0 8px; color: var(--vermillion); font-family: var(--serif); font-size: 17px; }
+.pilot-report-section div, .pilot-analysis-plain { white-space: pre-wrap; }
+.pilot-analysis-plain { padding: 18px; border: 1px solid var(--line); background: #fffdf8; }
 .pilot-next-action {
   padding: 15px 17px;
   border-left: 3px solid var(--vermillion);
@@ -922,6 +940,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .pilot-profile > div:first-child { flex-direction: column; gap: 4px; }
   .pilot-pillars { grid-template-columns: repeat(2, 1fr); }
   .pilot-profile-grid { grid-template-columns: 1fr; }
+  .pilot-report-grid { grid-template-columns: 1fr; }
+  .pilot-report-section:first-child { grid-column: auto; }
   .pilot-lock-banner { align-items: flex-start; flex-direction: column; gap: 14px; }
   .pilot-anchors article { padding: 18px 14px; }
 }
