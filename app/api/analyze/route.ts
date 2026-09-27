@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 type AnalysisRequest = {
   birth: {
+    callName: string;
     date: string;
     time: string;
     place: string;
@@ -20,25 +21,33 @@ function extractOutputText(payload: { output_text?: string; output?: Array<{ con
     .join("\n");
 }
 
+function stripDisplayPunctuation(value: string) {
+  return value
+    .replace(/[，。；、：！？《》【】“”‘’·｜,.!?;:()[\]{}"'—…#*]/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ *\n */g, "\n")
+    .trim();
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "DeepSeek 分析服务尚未配置，请稍后再试。" }, { status: 503 });
+    return NextResponse.json({ error: "DeepSeek 分析服务尚未配置 请稍后再试" }, { status: 503 });
   }
 
   let body: AnalysisRequest;
   try {
     body = (await request.json()) as AnalysisRequest;
   } catch {
-    return NextResponse.json({ error: "提交内容无法读取。" }, { status: 400 });
+    return NextResponse.json({ error: "提交内容无法读取" }, { status: 400 });
   }
 
-  if (!body?.birth?.date || !body.birth.time || !body.birth.place || !body.chart) {
-    return NextResponse.json({ error: "出生资料不完整，暂时无法生成报告。" }, { status: 400 });
+  if (!body?.birth?.callName || !body.birth.date || !body.birth.time || !body.birth.place || !body.chart) {
+    return NextResponse.json({ error: "档案资料不完整 暂时无法生成报告" }, { status: 400 });
   }
 
   const prompt = `
-你是“四镜人生档案”的中文解释助手。请根据下面已经由固定排盘引擎计算出的结构，写一份普通人能看懂的“整体人生档案初稿”。
+你是“四境人生档案”的中文解释助手。请根据下面已经由固定排盘引擎计算出的结构，写一份普通人能看懂的“整体人生档案初稿”。
 
 写作要求：
 1. 不要只复述四柱；要把结构翻译成日常语言，解释一个人可能怎样思考、行动、承压、做选择和与人相处。
@@ -48,6 +57,7 @@ export async function POST(request: Request) {
 5. 不做医疗、法律、投资、死亡、灾祸等高风险结论；遇到这些主题只提醒寻求现实专业帮助。
 6. 语气像一个认真、直接、愿意被事实推翻的分析者，不要提到 API、模型、提示词或内部技术。
 7. 最后给出 3 个用户可以继续追问的具体问题。
+8. 正文不使用标点符号 通过短句 换行与留白组织阅读节奏
 
 出生资料：
 ${JSON.stringify(body.birth, null, 2)}
@@ -71,12 +81,12 @@ ${JSON.stringify(body.chart, null, 2)}
   });
 
   if (!response.ok) {
-    return NextResponse.json({ error: "暂时无法生成报告，请稍后重试。" }, { status: 502 });
+    return NextResponse.json({ error: "暂时无法生成报告 请稍后重试" }, { status: 502 });
   }
 
   const payload = (await response.json()) as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
   const report = extractOutputText(payload);
-  if (!report) return NextResponse.json({ error: "报告暂时没有生成，请稍后重试。" }, { status: 502 });
+  if (!report) return NextResponse.json({ error: "报告暂时没有生成 请稍后重试" }, { status: 502 });
 
-  return NextResponse.json({ report });
+  return NextResponse.json({ report: stripDisplayPunctuation(report) });
 }

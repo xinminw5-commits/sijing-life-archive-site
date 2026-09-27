@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const title = "四镜人生档案｜先盲断，再核验";
-const description = "以结构、环境、气机、事件四轴建立可核验、可修正、持续更新的人生命理档案。";
+const title = "四境人生档案 一生万象 映于四境";
+const description = "以结构 环境 气机 事件四轴建立可核验 可修正 持续更新的人生命理档案";
 
 export async function generateMetadata(): Promise<Metadata> {
   const headerList = await headers();
@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       type: "website",
       locale: "zh_CN",
-      images: [{ url: socialImage, width: 1536, height: 1024, alt: "四镜人生档案" }],
+      images: [{ url: socialImage, width: 1536, height: 1024, alt: "四境人生档案" }],
     },
     twitter: {
       card: "summary_large_image",
