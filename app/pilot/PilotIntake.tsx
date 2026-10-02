@@ -10,6 +10,29 @@ const axisCopy = [
   ["人生境 验其应", "最后落回岁运与真实人生 于经历之中逐一求证"],
 ] as const;
 
+const reportHeadings = ["总脉络", "结构境 观其序", "时序境 察其时", "气机境 通其气", "人生境 验其应", "事业与财务", "关系与边界", "当前阶段", "现实核验清单", "结语"] as const;
+
+const axisExplanations: Record<string, string> = {
+  "结构境 观其序": "这一部分是在说：你的命盘内部，哪些力量是主线，哪些力量在支持或牵制它。先看清这个底层顺序，才不会把某一个性格标签当成全部人生。",
+  "时序境 察其时": "这一部分是在说：同一种能力放在不同的环境和阶段里，表现会不一样。这里关注的是当下的条件、压力与机会，而不是给你贴一个永远不变的标签。",
+  "气机境 通其气": "这一部分是在说：你的精力、表达、资源和行动是怎样流动的，哪里容易卡住，怎样转换之后更容易形成实际成果。",
+  "人生境 验其应": "这一部分是在说：把前面的结构带回真实经历，用工作、关系、迁移和阶段变化去核对。能被事实验证的才保留，不能对应的就继续标为待确认。",
+};
+
+type ReportBlock = { title: string; body: string };
+
+function parseReport(report: string): ReportBlock[] {
+  const matches = [...report.matchAll(/^(?:#{1,3}\s*)?(.+?)\s*$/gm)]
+    .filter((match) => reportHeadings.includes(match[1].trim() as typeof reportHeadings[number]));
+  if (!matches.length) return [{ title: "完整分析", body: report.trim() }];
+  return matches.map((match, index) => ({
+    title: match[1].trim(),
+    body: report.slice(match.index! + match[0].length, matches[index + 1]?.index ?? report.length)
+      .replace(/^\s+/, "")
+      .trim(),
+  })).filter((block) => block.body);
+}
+
 export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const [birth, setBirth] = useState({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
   const [chart, setChart] = useState<DeterministicChartResult | null>(null);
@@ -18,12 +41,13 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [openExplanations, setOpenExplanations] = useState<Record<string, boolean>>({});
 
   const ready = Boolean(birth.callName.trim() && birth.date && birth.time && birth.place.trim() && birth.gender && birth.consent);
 
   function update(key: keyof typeof birth, value: string | boolean) {
     setBirth((current) => ({ ...current, [key]: value }));
-    setChart(null); setError(""); setAnalysis(""); setAnalysisError("");
+    setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
   }
 
   async function requestAnalysis(result: DeterministicChartResult) {
@@ -93,7 +117,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
 
   function clear() {
     setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
-    setChart(null); setError(""); setAnalysis(""); setAnalysisError("");
+    setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
   }
 
   return (
@@ -133,8 +157,41 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
           <p className="archive-boundary">日主是结构计算中的日干 不等于完整性格结论<br />具体年份 关系和现实问题 需要带着事实再做核验</p>
         </> : <p className="archive-boundary">当前存在多个候选命盘 网页不会替你强行选定其中一个<br />先核对出生时间 再决定是否深入</p>}
         <div className="archive-result-actions"><button type="button" onClick={copyResult}>{copied ? "已复制" : "复制基础档案"}</button><a href="#deeper">带着具体问题找均均</a></div>
-        <section className="archive-deeper" id="deeper"><div className="archive-deeper-heading"><h4>进一步解读</h4><span>{analysisLoading ? "生成中" : analysis ? "已生成" : "等待生成"}</span></div>{analysisLoading && <p>正在整理命盘结构与人生主题<br />请稍候</p>}{analysisError && <p className="archive-error">{analysisError}</p>}{analysis && <div className="archive-analysis-text">{analysis}</div>}</section>
+        <section className="archive-deeper" id="deeper">
+          <div className="archive-deeper-heading"><div><p className="eyebrow"><span /> 深入阅读</p><h4>进一步解读</h4></div><span>{analysisLoading ? "生成中" : analysis ? "已生成" : "等待生成"}</span></div>
+          {analysisLoading && <div className="archive-analysis-loading"><i />正在整理命盘结构与人生主题<br />请稍候</div>}
+          {analysisError && <p className="archive-error">{analysisError}</p>}
+          {analysis && <AnalysisDisplay report={analysis} openExplanations={openExplanations} setOpenExplanations={setOpenExplanations} />}
+        </section>
       </div>}
     </section>
   );
+}
+
+function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { report: string; openExplanations: Record<string, boolean>; setOpenExplanations: (value: Record<string, boolean>) => void }) {
+  const blocks = parseReport(report);
+  const summary = blocks.find((block) => block.title === "总脉络");
+  const axes = blocks.filter((block) => axisExplanations[block.title]);
+  const supporting = blocks.filter((block) => block !== summary && !axisExplanations[block.title]);
+
+  function toggle(title: string) {
+    setOpenExplanations({ ...openExplanations, [title]: !openExplanations[title] });
+  }
+
+  return <div className="archive-analysis-layout">
+    {summary && <article className="analysis-summary"><div className="analysis-kicker">先看这一条主线</div><h5>{summary.title}</h5><p>{summary.body}</p></article>}
+    {axes.length > 0 && <div className="analysis-axis-intro"><span>四轴拆解</span><p>先读正式分析，再按需要打开白话解释。四个方向彼此连接，不是四个孤立的性格标签。</p></div>}
+    <div className="analysis-axis-grid">
+      {axes.map((block, index) => <article className={`analysis-axis-card axis-${index + 1}`} key={block.title}>
+        <div className="analysis-axis-number">0{index + 1}</div>
+        <div className="analysis-axis-card-heading"><h5>{block.title}</h5><span>正式分析</span></div>
+        <p className="analysis-official">{block.body}</p>
+        <button className="analysis-explain-button" type="button" aria-expanded={Boolean(openExplanations[block.title])} onClick={() => toggle(block.title)}>
+          {openExplanations[block.title] ? "收起简易解释" : "看简易解释"}<b>{openExplanations[block.title] ? "−" : "+"}</b>
+        </button>
+        {openExplanations[block.title] && <div className="analysis-explanation">{axisExplanations[block.title]}</div>}
+      </article>)}
+    </div>
+    {supporting.length > 0 && <div className="analysis-supporting"><div className="analysis-supporting-heading"><span>落回现实</span><p>这些部分把四轴分析放回工作、关系、阶段和具体核验。</p></div><div className="analysis-supporting-grid">{supporting.map((block) => <article key={block.title}><h5>{block.title}</h5><p>{block.body}</p></article>)}</div></div>}
+  </div>;
 }
