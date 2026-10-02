@@ -574,6 +574,44 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .analysis-supporting article { padding: 19px 20px; background: #f3eee5; }
 .analysis-supporting article h5 { margin: 0 0 10px; color: var(--teal); font-size: 18px; }
 .analysis-supporting article p { margin: 0; color: var(--ink-soft); font-size: 11px; line-height: 1.9; white-space: pre-wrap; }
+.analysis-lens-shell { display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 420px; border: 1px solid rgba(24,63,58,.22); background: #f1ebe0; box-shadow: 14px 18px 0 rgba(179,147,93,.08); }
+.analysis-lens-rail { display: grid; align-content: stretch; border-right: 1px solid rgba(24,63,58,.18); background: #e7dfd1; }
+.analysis-lens-tab { position: relative; display: grid; grid-template-columns: 28px 1fr; align-content: center; gap: 3px 10px; min-height: 104px; padding: 18px 17px; border: 0; border-bottom: 1px solid rgba(24,63,58,.13); background: transparent; color: var(--ink-soft); text-align: left; cursor: pointer; transition: background .3s ease, color .3s ease, padding .3s ease; }
+.analysis-lens-tab:last-child { border-bottom: 0; }
+.analysis-lens-tab:hover, .analysis-lens-tab.is-active { padding-left: 23px; background: #f7f1e7; color: var(--teal); }
+.analysis-lens-tab.is-active::before { content: ""; position: absolute; inset: 13px auto 13px 0; width: 3px; background: var(--vermillion); }
+.analysis-lens-tab.axis-2.is-active::before { background: var(--gold); }
+.analysis-lens-tab.axis-3.is-active::before { background: var(--teal-light); }
+.analysis-lens-tab.axis-4.is-active::before { background: #806b54; }
+.analysis-lens-tab-index { grid-row: span 2; color: rgba(168,73,53,.55); font-family: var(--serif); font-size: 18px; }
+.analysis-lens-tab-name { align-self: end; font-family: var(--serif); font-size: 15px; }
+.analysis-lens-tab small { color: #8b918b; font-size: 9px; letter-spacing: .1em; }
+.analysis-lens-tab i { position: absolute; right: 16px; top: 18px; width: 8px; height: 8px; border: 1px solid currentColor; border-radius: 50%; opacity: .45; }
+.analysis-lens-tab.is-active i { background: currentColor; opacity: 1; box-shadow: 0 0 0 4px rgba(168,73,53,.1); }
+.analysis-lens-stage { position: relative; overflow: hidden; padding: 32px 39px 34px; background: #fffdf8; animation: lens-stage-in .42s cubic-bezier(.2,.75,.25,1) both; }
+.analysis-lens-stage::before { content: "观"; position: absolute; right: 27px; top: 5px; color: rgba(24,63,58,.045); font-family: var(--serif); font-size: 170px; line-height: 1; pointer-events: none; }
+.analysis-lens-stage.axis-2::before { content: "时"; }
+.analysis-lens-stage.axis-3::before { content: "气"; }
+.analysis-lens-stage.axis-4::before { content: "应"; }
+.analysis-lens-stage-top, .analysis-lens-title, .analysis-lens-rule, .analysis-lens-label, .analysis-lens-stage > p, .analysis-lens-stage > button, .analysis-lens-stage > div:last-child { position: relative; z-index: 1; }
+.analysis-lens-stage-top { display: flex; justify-content: space-between; gap: 16px; color: #8b918b; font-size: 9px; letter-spacing: .13em; }
+.analysis-lens-stage-top em { color: var(--vermillion); font-style: normal; }
+.analysis-lens-title { display: flex; align-items: baseline; gap: 14px; margin-top: 45px; }
+.analysis-lens-title b { color: var(--teal); font-family: var(--serif); font-size: 39px; font-weight: 500; }
+.analysis-lens-title h5 { margin: 0; color: var(--vermillion); font-family: var(--serif); font-size: 22px; font-weight: 500; }
+.analysis-lens-rule { width: 70px; height: 1px; margin: 17px 0 22px; background: var(--vermillion); }
+.analysis-lens-label { color: #8b918b; font-size: 9px; letter-spacing: .16em; }
+.analysis-lens-stage .analysis-official { max-width: 760px; margin-top: 9px; color: var(--ink-soft); font-size: 13px; line-height: 2.05; }
+.analysis-lens-stage .analysis-explain-button { display: flex; align-items: center; margin-top: 25px; padding: 14px 0 0; border-top: 1px solid var(--line); color: var(--teal); }
+.analysis-lens-stage .analysis-explain-button span { display: grid; gap: 3px; }
+.analysis-lens-stage .analysis-explain-button b { display: block; width: auto; height: auto; border: 0; border-radius: 0; font-family: var(--serif); font-size: 14px; font-weight: 500; line-height: 1.4; }
+.analysis-lens-stage .analysis-explain-button small { color: #8b918b; font-size: 9px; }
+.analysis-lens-stage .analysis-explain-button strong { display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid currentColor; border-radius: 50%; font-size: 15px; font-weight: 400; }
+.analysis-lens-stage .analysis-explain-button.is-open { color: var(--vermillion); }
+.analysis-lens-stage .analysis-explanation { display: grid; gap: 7px; max-width: 760px; margin-top: 15px; padding: 16px 18px; border-left: 2px solid var(--vermillion); background: #f3ede2; color: var(--ink); font-size: 12px; line-height: 1.9; animation: lens-note-in .34s ease both; }
+.analysis-lens-stage .analysis-explanation span { color: var(--vermillion); font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+@keyframes lens-stage-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes lens-note-in { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
 .archive-method { padding: 88px clamp(22px, 8vw, 120px); }
 .archive-section-heading { max-width: 740px; margin-bottom: 44px; }
 .archive-section-heading h2 { margin: 0; font-family: var(--serif); font-size: clamp(32px, 4vw, 52px); font-weight: 500; }
@@ -625,6 +663,19 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .analysis-summary p { font-size: 12px; line-height: 1.9; }
   .analysis-axis-intro, .analysis-supporting-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .analysis-axis-card { padding: 20px 18px; }
+  .analysis-lens-shell { grid-template-columns: 1fr; box-shadow: 8px 10px 0 rgba(179,147,93,.08); }
+  .analysis-lens-rail { grid-template-columns: repeat(4, 1fr); border-right: 0; border-bottom: 1px solid rgba(24,63,58,.18); }
+  .analysis-lens-tab { min-height: 76px; padding: 13px 9px; gap: 2px 5px; }
+  .analysis-lens-tab:hover, .analysis-lens-tab.is-active { padding-left: 11px; }
+  .analysis-lens-tab.is-active::before { inset: auto 8px 0; width: auto; height: 3px; }
+  .analysis-lens-tab-index { font-size: 13px; }
+  .analysis-lens-tab-name { font-size: 12px; }
+  .analysis-lens-tab small { font-size: 8px; }
+  .analysis-lens-tab i { display: none; }
+  .analysis-lens-stage { padding: 25px 19px 27px; }
+  .analysis-lens-title { margin-top: 33px; }
+  .analysis-lens-title b { font-size: 31px; }
+  .analysis-lens-title h5 { font-size: 18px; }
   .archive-pillars { grid-template-columns: repeat(2, 1fr); }
   .archive-generate-row, .archive-result-actions { align-items: stretch; flex-direction: column; }
   .archive-generate-row .button, .archive-result-actions button { width: 100%; }
@@ -633,7 +684,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .orbit { animation: none; }
+  .orbit, .analysis-lens-stage, .analysis-lens-stage .analysis-explanation, .archive-analysis-loading i { animation: none; }
   *, *::before, *::after { transition-duration: .01ms !important; }
 }
 

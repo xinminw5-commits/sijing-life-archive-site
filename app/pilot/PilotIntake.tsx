@@ -173,6 +173,8 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
   const summary = blocks.find((block) => block.title === "总脉络");
   const axes = blocks.filter((block) => axisExplanations[block.title]);
   const supporting = blocks.filter((block) => block !== summary && !axisExplanations[block.title]);
+  const [activeAxis, setActiveAxis] = useState(0);
+  const activeBlock = axes[activeAxis] ?? axes[0];
 
   function toggle(title: string) {
     setOpenExplanations({ ...openExplanations, [title]: !openExplanations[title] });
@@ -180,18 +182,27 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
 
   return <div className="archive-analysis-layout">
     {summary && <article className="analysis-summary"><div className="analysis-kicker">先看这一条主线</div><h5>{summary.title}</h5><p>{summary.body}</p></article>}
-    {axes.length > 0 && <div className="analysis-axis-intro"><span>四轴拆解</span><p>先读正式分析，再按需要打开白话解释。四个方向彼此连接，不是四个孤立的性格标签。</p></div>}
-    <div className="analysis-axis-grid">
-      {axes.map((block, index) => <article className={`analysis-axis-card axis-${index + 1}`} key={block.title}>
-        <div className="analysis-axis-number">0{index + 1}</div>
-        <div className="analysis-axis-card-heading"><h5>{block.title}</h5><span>正式分析</span></div>
-        <p className="analysis-official">{block.body}</p>
-        <button className="analysis-explain-button" type="button" aria-expanded={Boolean(openExplanations[block.title])} onClick={() => toggle(block.title)}>
-          {openExplanations[block.title] ? "收起简易解释" : "看简易解释"}<b>{openExplanations[block.title] ? "−" : "+"}</b>
-        </button>
-        {openExplanations[block.title] && <div className="analysis-explanation">{axisExplanations[block.title]}</div>}
-      </article>)}
-    </div>
+    {axes.length > 0 && <>
+      <div className="analysis-axis-intro"><span>四境阅览台</span><p>点击左侧印记切换阅读视角。先看正式分析，再打开白话译注；四个方向共同组成一份人生档案。</p></div>
+      <div className="analysis-lens-shell">
+        <nav className="analysis-lens-rail" aria-label="四境分析视角">
+          {axes.map((block, index) => <button className={`analysis-lens-tab axis-${index + 1}${activeAxis === index ? " is-active" : ""}`} type="button" role="tab" aria-selected={activeAxis === index} key={block.title} onClick={() => setActiveAxis(index)}>
+            <span className="analysis-lens-tab-index">0{index + 1}</span><span className="analysis-lens-tab-name">{block.title.split(" ")[0]}</span><small>{block.title.split(" ").slice(1).join(" ")}</small><i />
+          </button>)}
+        </nav>
+        {activeBlock && <article className={`analysis-lens-stage axis-${activeAxis + 1}`} key={activeBlock.title} role="tabpanel">
+          <div className="analysis-lens-stage-top"><span>当前视角 · {String(activeAxis + 1).padStart(2, "0")}</span><em>{activeBlock.title.split(" ").slice(1).join(" ")}</em></div>
+          <div className="analysis-lens-title"><b>{activeBlock.title.split(" ")[0]}</b><h5>{activeBlock.title.split(" ").slice(1).join(" ")}</h5></div>
+          <div className="analysis-lens-rule" />
+          <div className="analysis-lens-label">原文解读</div>
+          <p className="analysis-official">{activeBlock.body}</p>
+          <button className={`analysis-explain-button${openExplanations[activeBlock.title] ? " is-open" : ""}`} type="button" aria-expanded={Boolean(openExplanations[activeBlock.title])} onClick={() => toggle(activeBlock.title)}>
+            <span><b>{openExplanations[activeBlock.title] ? "收起译注" : "打开白话译注"}</b><small>{openExplanations[activeBlock.title] ? "回到正式分析" : "把这一轴翻译成日常语言"}</small></span><strong>{openExplanations[activeBlock.title] ? "↑" : "↓"}</strong>
+          </button>
+          {openExplanations[activeBlock.title] && <div className="analysis-explanation"><span>白话译注</span>{axisExplanations[activeBlock.title]}</div>}
+        </article>}
+      </div>
+    </>}
     {supporting.length > 0 && <div className="analysis-supporting"><div className="analysis-supporting-heading"><span>落回现实</span><p>这些部分把四轴分析放回工作、关系、阶段和具体核验。</p></div><div className="analysis-supporting-grid">{supporting.map((block) => <article key={block.title}><h5>{block.title}</h5><p>{block.body}</p></article>)}</div></div>}
   </div>;
 }
