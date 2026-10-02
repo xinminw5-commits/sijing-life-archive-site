@@ -19,6 +19,13 @@ const axisExplanations: Record<string, string> = {
   "人生境 验其应": "这一部分是在说：把前面的结构带回真实经历，用工作、关系、迁移和阶段变化去核对。能被事实验证的才保留，不能对应的就继续标为待确认。",
 };
 
+const axisMeta: Record<string, { source: string; question: string; links: string }> = {
+  "结构境 观其序": { source: "子平真诠", question: "这张命盘的主次与承载是什么？", links: "时序境 · 气机境" },
+  "时序境 察其时": { source: "穷通宝鉴", question: "同一种力量，为什么在此时这样表现？", links: "结构境 · 人生境" },
+  "气机境 通其气": { source: "滴天髓", question: "力量从哪里来，又如何变成行动？", links: "结构境 · 现实表现" },
+  "人生境 验其应": { source: "岁运与现实验证", question: "哪些判断能回到经历中被核对？", links: "当前阶段 · 核验清单" },
+};
+
 type ReportBlock = { title: string; body: string };
 
 function parseReport(report: string): ReportBlock[] {
@@ -185,11 +192,14 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
     {axes.length > 0 && <>
       <div className="analysis-axis-intro"><span>四境阅览台</span><p>点击左侧印记切换阅读视角。先看正式分析，再打开白话译注；四个方向共同组成一份人生档案。</p></div>
       <div className="analysis-lens-shell">
-        <nav className="analysis-lens-rail" aria-label="四境分析视角">
+        <aside className="analysis-lens-index"><div className="analysis-panel-label">四境分工</div><p>一份档案，四种观看方式</p>
+          <nav className="analysis-lens-rail" aria-label="四境分析视角">
           {axes.map((block, index) => <button className={`analysis-lens-tab axis-${index + 1}${activeAxis === index ? " is-active" : ""}`} type="button" role="tab" aria-selected={activeAxis === index} key={block.title} onClick={() => setActiveAxis(index)}>
             <span className="analysis-lens-tab-index">0{index + 1}</span><span className="analysis-lens-tab-name">{block.title.split(" ")[0]}</span><small>{block.title.split(" ").slice(1).join(" ")}</small><i />
           </button>)}
-        </nav>
+          </nav>
+          <div className="analysis-index-note">点击一境，中央档案会切换；右侧译注同步更新。</div>
+        </aside>
         {activeBlock && <article className={`analysis-lens-stage axis-${activeAxis + 1}`} key={activeBlock.title} role="tabpanel">
           <div className="analysis-lens-stage-top"><span>当前视角 · {String(activeAxis + 1).padStart(2, "0")}</span><em>{activeBlock.title.split(" ").slice(1).join(" ")}</em></div>
           <div className="analysis-lens-title"><b>{activeBlock.title.split(" ")[0]}</b><h5>{activeBlock.title.split(" ").slice(1).join(" ")}</h5></div>
@@ -201,6 +211,7 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
           </button>
           {openExplanations[activeBlock.title] && <div className="analysis-explanation"><span>白话译注</span>{axisExplanations[activeBlock.title]}</div>}
         </article>}
+        {activeBlock && <aside className="analysis-lens-context"><div className="analysis-panel-label">当前轴档案</div><div className="analysis-context-seal">{activeBlock.title.slice(0, 1)}</div><h5>{activeBlock.title}</h5><span className="analysis-context-source">依据 · {axisMeta[activeBlock.title]?.source}</span><div className="analysis-context-rule" /><small>它主要回答</small><p>{axisMeta[activeBlock.title]?.question}</p><div className="analysis-context-translate"><span>白话译注</span><p>{axisExplanations[activeBlock.title]}</p></div><small>关联阅读</small><b className="analysis-context-links">{axisMeta[activeBlock.title]?.links}</b></aside>}
       </div>
     </>}
     {supporting.length > 0 && <div className="analysis-supporting"><div className="analysis-supporting-heading"><span>落回现实</span><p>这些部分把四轴分析放回工作、关系、阶段和具体核验。</p></div><div className="analysis-supporting-grid">{supporting.map((block) => <article key={block.title}><h5>{block.title}</h5><p>{block.body}</p></article>)}</div></div>}
