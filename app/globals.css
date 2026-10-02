@@ -466,6 +466,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .premium-hero-workbench > .archive-tool { align-self: center; padding: 0 0 0 clamp(22px, 4vw, 62px); }
 .premium-hero-workbench > .archive-tool--hero .archive-form-card { border: 1px solid rgba(24,63,58,.2); border-top: 3px solid var(--vermillion); background: rgba(250,247,240,.82); box-shadow: 0 26px 70px rgba(38,42,36,.13); backdrop-filter: blur(10px); }
 .premium-hero-workbench > .archive-tool--hero .archive-form-title h2 { font-size: 27px; }
+@media (min-width: 1001px) {
+  .premium-hero-workbench { grid-template-columns: minmax(190px, .6fr) minmax(430px, 1.1fr) minmax(300px, .9fr); }
+  .premium-hero-workbench > .archive-tool { grid-column: 2; grid-row: 1; padding-left: clamp(28px, 4vw, 62px); padding-right: clamp(28px, 4vw, 62px); }
+  .premium-hero-workbench > .archive-tool--hero .archive-form-card { max-width: 600px; margin-inline: auto; }
+  .premium-hero-workbench > .workbench-center { grid-column: 3; grid-row: 1; padding-inline: clamp(18px, 3vw, 48px); }
+}
 
 @media (max-width: 1000px) {
   .premium-hero-workbench { grid-template-columns: 170px minmax(0, 1fr); }
