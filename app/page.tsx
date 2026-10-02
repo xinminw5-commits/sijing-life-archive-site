@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HeroSignals } from "./HeroSignals";
 import { PilotIntake } from "./pilot/PilotIntake";
 
 export const metadata: Metadata = {
@@ -21,7 +22,7 @@ export default function Home() {
         <p className="eyebrow"><span /> SIJING ARCHIVE</p>
         <h1>一生万象<br /><em>映于四境</em></h1>
         <p>以出生时间为起点 从结构 环境 气机与人生阶段四个维度 生成一份可追溯 可更新的个人档案</p>
-        <div className="premium-signals"><span>观其序</span><span>察其时</span><span>通其气</span><span>验其应</span></div>
+        <HeroSignals />
       </div>
       <PilotIntake compact />
     </section>

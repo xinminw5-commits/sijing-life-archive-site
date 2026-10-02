@@ -431,10 +431,42 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 }
 .premium-hero-copy h1 em { color: var(--teal); font-style: normal; }
 .premium-hero-copy > p:not(.eyebrow) { max-width: 570px; margin: 28px 0 0; color: var(--ink-soft); font-family: var(--serif); font-size: 16px; line-height: 2; }
-.premium-signals { display: flex; flex-wrap: wrap; gap: 0; margin-top: 36px; border-block: 1px solid var(--line); }
-.premium-signals span { padding: 12px 18px; color: #4d5955; font-family: var(--serif); font-size: 12px; letter-spacing: .08em; }
-.premium-signals span:first-child { padding-left: 0; }
-.premium-signals span + span { border-left: 1px solid var(--line); }
+.premium-signals { margin-top: 36px; border-block: 1px solid var(--line); }
+.premium-signal-tabs { display: grid; grid-template-columns: repeat(4, 1fr); }
+.premium-signal-tabs button {
+  position: relative;
+  min-height: 68px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px 18px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: #7a817c;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .35s ease, color .35s ease, transform .35s ease;
+}
+.premium-signal-tabs button:first-child { border-left: 0; padding-left: 0; }
+.premium-signal-tabs button:hover,
+.premium-signal-tabs button:focus-visible,
+.premium-signal-tabs button.is-active { background: rgba(255,255,255,.3); color: var(--teal); }
+.premium-signal-tabs button.is-active { transform: translateY(-2px); }
+.premium-signal-tabs button:focus-visible { outline: 1px solid var(--vermillion); outline-offset: -2px; }
+.premium-signal-tabs small { color: var(--vermillion); font-size: 8px; letter-spacing: .16em; opacity: .65; }
+.premium-signal-tabs button.is-active small { opacity: 1; }
+.premium-signal-tabs button > span { font-family: var(--serif); font-size: 13px; letter-spacing: .08em; }
+.signal-progress { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; overflow: hidden; background: transparent; }
+.signal-progress b { display: block; width: 100%; height: 100%; transform: scaleX(0); transform-origin: left; background: var(--vermillion); animation: signal-progress 3.2s linear forwards; }
+.premium-signals.is-paused .signal-progress b { animation-play-state: paused; }
+.premium-signal-status { min-height: 34px; display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 0 0; color: var(--ink-soft); font-family: var(--serif); font-size: 11px; animation: signal-copy-in .45s ease both; }
+.premium-signal-status strong { color: var(--teal); font-weight: 600; }
+.signal-status-dot { width: 5px; height: 5px; flex: 0 0 auto; border-radius: 50%; background: var(--vermillion); box-shadow: 0 0 0 4px rgba(168,73,53,.12); animation: signal-pulse 1.8s ease-in-out infinite; }
+@keyframes signal-progress { to { transform: scaleX(1); } }
+@keyframes signal-copy-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes signal-pulse { 50% { opacity: .45; transform: scale(.8); } }
 .archive-tool--hero { align-self: stretch; display: grid; align-content: center; padding: 0; background: transparent; }
 .archive-tool--hero .archive-form-card { width: 100%; padding: clamp(30px, 3.4vw, 46px); border-top: 3px solid var(--vermillion); box-shadow: 0 30px 90px rgba(38, 42, 36, .14); }
 .archive-form-title { margin-bottom: 28px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
@@ -547,9 +579,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .premium-hero-copy h1 { font-size: 46px; line-height: 1.18; }
   .premium-hero-copy > p:not(.eyebrow) { margin-top: 20px; font-size: 14px; line-height: 1.85; }
   .premium-signals { margin-top: 26px; }
-  .premium-signals span { padding: 10px 8px; font-size: 10px; }
-  .premium-signals span:first-child { padding-left: 0; }
-  .premium-signals span + span::before { margin-right: 8px; }
+  .premium-signal-tabs button { min-height: 62px; padding: 9px 8px; }
+  .premium-signal-tabs button:first-child { padding-left: 0; }
+  .premium-signal-tabs button > span { font-size: 11px; }
+  .premium-signal-status { font-size: 10px; line-height: 1.5; }
   .archive-tool--hero .archive-form-card { padding: 26px 18px; }
   .archive-hero { padding-inline: 22px; }
   .archive-hero h1, .archive-subhero h1 { font-size: 38px; }
