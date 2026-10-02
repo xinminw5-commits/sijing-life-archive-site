@@ -17,11 +17,13 @@ const axes = [
 export default function Home() {
   return <main className="archive-home">
     <header className="site-header archive-header"><a className="brand" href="#top" aria-label="四境人生档案首页"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>SIJING ARCHIVE</small></span></a><nav aria-label="主导航"><a href="#method">四境体系</a><a href="#boundary">解读边界</a><a className="nav-cta" href="#intake">建立档案</a></nav></header>
-    <section className="premium-hero" id="top">
-      <div className="premium-hero-copy">
-        <p className="eyebrow"><span /> SIJING ARCHIVE</p>
+    <section className="premium-hero premium-hero-workbench" id="top">
+      <aside className="workbench-index"><div className="workbench-index-head"><span>四境分工</span><b>SIJING<br />ARCHIVE</b></div><p className="workbench-index-title">一份档案<br />四种观看方式</p><div className="workbench-axis-list">{axes.map(([title, subtitle, , source], index) => <div className={`workbench-axis-row axis-${index + 1}`} key={title}><strong>0{index + 1}</strong><span><b>{title}</b><small>{subtitle}</small></span><em>{source}</em></div>)}</div><p className="workbench-index-note">不以一个标签概括一生<br />让结构、时序、气机与经历互相核对。</p></aside>
+      <div className="workbench-center">
+        <p className="eyebrow"><span /> PERSONAL LIFE ARCHIVE</p>
         <h1>一生万象<br /><em>映于四境</em></h1>
-        <p>以出生时间为起点 从结构 环境 气机与人生阶段四个维度 生成一份可追溯 可更新的个人档案</p>
+        <p className="workbench-lead">从出生时间开始，建立一份可以阅读、追问，也可以被现实修正的个人档案。</p>
+        <div className="workbench-compass" aria-hidden="true"><div className="compass-ring compass-ring-outer" /><div className="compass-ring compass-ring-inner" /><span className="compass-word compass-word-top">观其序</span><span className="compass-word compass-word-right">察其时</span><span className="compass-word compass-word-bottom">验其应</span><span className="compass-word compass-word-left">通其气</span><div className="compass-core"><small>四境</small><strong>档案</strong><em>ARCHIVE</em></div></div>
         <HeroSignals />
       </div>
       <PilotIntake compact />
