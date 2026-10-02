@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-
 type AnalysisRequest = {
   birth: {
     callName: string;
@@ -31,21 +29,21 @@ function stripDisplayPunctuation(value: string) {
   return value.trim();
 }
 
-export async function POST(request: Request) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+export async function onRequestPost({ request, env }: { request: Request; env: Record<string, string | undefined> }) {
+  const apiKey = env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "DeepSeek 分析服务尚未配置 请稍后再试" }, { status: 503 });
+    return Response.json({ error: "DeepSeek 分析服务尚未配置 请稍后再试" }, { status: 503 });
   }
 
   let body: AnalysisRequest;
   try {
     body = (await request.json()) as AnalysisRequest;
   } catch {
-    return NextResponse.json({ error: "提交内容无法读取" }, { status: 400 });
+    return Response.json({ error: "提交内容无法读取" }, { status: 400 });
   }
 
   if (!body?.birth?.callName || !body.birth.date || !body.birth.time || !body.birth.place || !body.chart) {
-    return NextResponse.json({ error: "档案资料不完整 暂时无法生成报告" }, { status: 400 });
+    return Response.json({ error: "档案资料不完整 暂时无法生成报告" }, { status: 400 });
   }
 
   const prompt = `
@@ -82,7 +80,7 @@ ${body.birth.context || "用户尚未提供现实经历，只能做条件化结�
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
+        model: env.DEEPSEEK_MODEL || "deepseek-flash",
         instructions: prompt,
         input: "请严格按照上述要求输出最终报告正文。",
         reasoning: { effort: "none" },
@@ -91,11 +89,11 @@ ${body.birth.context || "用户尚未提供现实经历，只能做条件化结�
       }),
     });
   } catch {
-    return NextResponse.json({ error: "分析服务连接超时 请稍后重试" }, { status: 502 });
+    return Response.json({ error: "分析服务连接超时 请稍后重试" }, { status: 502 });
   }
 
   if (!response.ok) {
-    return NextResponse.json({ error: "暂时无法生成报告 请稍后重试" }, { status: 502 });
+    return Response.json({ error: "暂时无法生成报告 请稍后重试" }, { status: 502 });
   }
 
   let payload: {
@@ -105,10 +103,10 @@ ${body.birth.context || "用户尚未提供现实经历，只能做条件化结�
   try {
     payload = (await response.json()) as typeof payload;
   } catch {
-    return NextResponse.json({ error: "分析服务返回格式异常 请稍后重试" }, { status: 502 });
+    return Response.json({ error: "分析服务返回格式异常 请稍后重试" }, { status: 502 });
   }
   const report = extractOutputText(payload);
-  if (!report) return NextResponse.json({ error: "报告暂时没有生成 请稍后重试" }, { status: 502 });
+  if (!report) return Response.json({ error: "报告暂时没有生成 请稍后重试" }, { status: 502 });
 
-  return NextResponse.json({ report: stripDisplayPunctuation(report) });
+  return Response.json({ report: stripDisplayPunctuation(report) });
 }

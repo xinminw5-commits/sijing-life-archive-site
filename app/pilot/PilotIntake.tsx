@@ -11,7 +11,7 @@ const axisCopy = [
 ] as const;
 
 export function PilotIntake({ compact = false }: { compact?: boolean }) {
-  const [birth, setBirth] = useState({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", consent: false });
+  const [birth, setBirth] = useState({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
   const [chart, setChart] = useState<DeterministicChartResult | null>(null);
   const [error, setError] = useState("");
   const [analysis, setAnalysis] = useState("");
@@ -33,11 +33,17 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          birth: { callName: birth.callName.trim(), date: birth.date, time: birth.time, place: birth.place.trim(), gender: birth.gender, focus: birth.focus.trim() || "整体人生结构" },
+          birth: { callName: birth.callName.trim(), date: birth.date, time: birth.time, place: birth.place.trim(), gender: birth.gender, focus: birth.focus.trim() || "整体人生结构", context: birth.context.trim() },
           chart: result,
         }),
       });
-      const payload = (await response.json()) as { report?: string; error?: string };
+      const raw = await response.text();
+      let payload: { report?: string; error?: string };
+      try {
+        payload = JSON.parse(raw) as { report?: string; error?: string };
+      } catch {
+        throw new Error("分析接口暂时没有返回有效结果，请刷新页面后重试");
+      }
       if (!response.ok || !payload.report) throw new Error(payload.error || "补充说明暂时无法生成");
       setAnalysis(payload.report);
     } catch (requestError) {
@@ -86,7 +92,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   }
 
   function clear() {
-    setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", consent: false });
+    setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
     setChart(null); setError(""); setAnalysis(""); setAnalysisError("");
   }
 
@@ -112,6 +118,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
           <label><span>出生时刻</span><input type="time" value={birth.time} onChange={(event) => update("time", event.target.value)} /></label>
           <label><span>性别 <small>用于大运顺逆</small></span><select value={birth.gender} onChange={(event) => update("gender", event.target.value)}><option value="">请选择</option><option>男</option><option>女</option></select></label>
           <label className="archive-form-span"><span>想先了解的主题 <small>可选</small></span><input value={birth.focus} onChange={(event) => update("focus", event.target.value)} placeholder="例如 事业 关系 迁移或当前阶段" /></label>
+          <label className="archive-form-span"><span>现实处境与经历 <small>越具体 越能避免泛泛而谈</small></span><textarea rows={5} value={birth.context} onChange={(event) => update("context", event.target.value)} placeholder="可以写最近几年重要的工作、关系、迁移、财务或情绪经历，以及你现在最想核对的问题。本站只在本次请求中使用，不作长期留存。" /></label>
         </div>
         <label className="archive-consent"><input type="checkbox" checked={birth.consent} onChange={(event) => update("consent", event.target.checked)} /><span>我同意使用本次出生信息生成档案<br />本站不作长期留存</span></label>
         <div className="archive-generate-row"><button className="button button-primary" type="button" onClick={generate} disabled={!ready}>生成我的基础档案</button>{!ready && <small>请留下称呼并补全出生信息与授权</small>}</div>

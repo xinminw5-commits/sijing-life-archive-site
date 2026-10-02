@@ -478,8 +478,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .archive-form-grid label { display: grid; gap: 8px; }
 .archive-form-grid label > span { color: #39433f; font-size: 11px; font-weight: 600; }
 .archive-form-grid small { color: #8c918e; font-weight: 400; }
-.archive-form-grid input, .archive-form-grid select { width: 100%; min-height: 48px; padding: 11px 12px; border: 1px solid rgba(23,32,30,.2); border-radius: 0; background: #fffdf8; color: var(--ink); font: inherit; font-size: 13px; }
-.archive-form-grid input:focus, .archive-form-grid select:focus { outline: 2px solid rgba(168,73,53,.25); border-color: var(--vermillion); }
+.archive-form-grid input, .archive-form-grid select, .archive-form-grid textarea { width: 100%; min-height: 48px; padding: 11px 12px; border: 1px solid rgba(23,32,30,.2); border-radius: 0; background: #fffdf8; color: var(--ink); font: inherit; font-size: 13px; }
+.archive-form-grid textarea { resize: vertical; line-height: 1.7; }
+.archive-form-grid input:focus, .archive-form-grid select:focus, .archive-form-grid textarea:focus { outline: 2px solid rgba(168,73,53,.25); border-color: var(--vermillion); }
 .archive-form-span { grid-column: 1 / -1; }
 .archive-consent { display: flex; gap: 10px; align-items: start; margin-top: 25px; color: var(--ink-soft); font-size: 11px; }
 .archive-consent input { width: 16px; height: 16px; accent-color: var(--teal); }
