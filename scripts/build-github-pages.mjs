@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,7 +25,7 @@ async function render(pathname) {
 function rewrite(html, prefix) {
   return html
     .replaceAll('/assets/', `${prefix}assets/`)
-    .replaceAll('http://localhost/', 'https://xinminw5-commits.github.io/sijing-life-archive-site/')
+    .replaceAll('http://localhost/', 'https://sijing-life-archive.pages.dev/')
     .replaceAll('href="/favicon.svg"', `href="${prefix}favicon.svg"`)
     .replaceAll('href="/og.png"', `href="${prefix}og.png"`)
     .replaceAll('href="/"', `href="${prefix}"`);
@@ -40,4 +40,4 @@ await cp(join(project, "public", "og.png"), join(pages, "og.png"));
 await writeFile(join(pages, "index.html"), rewrite(await render("/"), "./"));
 await writeFile(join(pages, "pilot", "index.html"), rewrite(await render("/pilot"), "../"));
 
-console.log(`GitHub Pages output written to ${relative(project, pages)}`);
+console.log(`Cloudflare Pages output written to ${relative(project, pages)}`);

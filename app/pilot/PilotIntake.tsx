@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { provinces, resolveBirthPlace, type RegionSelection } from "../../lib/regions/index.ts";
 import { calculateDeterministicChart, ChartCalculationError, type DeterministicChartResult } from "../../domain/chart/index.ts";
 
 const axisCopy = [
@@ -42,6 +43,12 @@ function parseReport(report: string): ReportBlock[] {
 
 export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const [birth, setBirth] = useState({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
+  const [region, setRegion] = useState<RegionSelection>({ province: "", city: "", district: "" });
+  const [manualPlace, setManualPlace] = useState(false);
+  const regionPlace = resolveBirthPlace(region);
+  const place = manualPlace ? birth.place.trim() : regionPlace;
+  const cities = provinces.find((item) => item.code === region.province)?.children ?? [];
+  const districts = cities.find((item) => item.code === region.city)?.children ?? [];
   const [chart, setChart] = useState<DeterministicChartResult | null>(null);
   const [error, setError] = useState("");
   const [analysis, setAnalysis] = useState("");
@@ -50,11 +57,19 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [openExplanations, setOpenExplanations] = useState<Record<string, boolean>>({});
 
-  const ready = Boolean(birth.callName.trim() && birth.date && birth.time && birth.place.trim() && birth.gender && birth.consent);
+  const ready = Boolean(birth.callName.trim() && birth.date && birth.time && place && birth.gender && birth.consent);
 
   function update(key: keyof typeof birth, value: string | boolean) {
     setBirth((current) => ({ ...current, [key]: value }));
     setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
+  }
+
+  function updateRegion(level: keyof RegionSelection, value: string) {
+    setRegion((current) => level === "province"
+      ? { province: value, city: "", district: "" }
+      : level === "city" ? { ...current, city: value, district: "" }
+      : { ...current, district: value });
+    update("place", "");
   }
 
   async function requestAnalysis(result: DeterministicChartResult) {
@@ -64,7 +79,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          birth: { callName: birth.callName.trim(), date: birth.date, time: birth.time, place: birth.place.trim(), gender: birth.gender, focus: birth.focus.trim() || "整体人生结构", context: birth.context.trim() },
+          birth: { callName: birth.callName.trim(), date: birth.date, time: birth.time, place, gender: birth.gender, focus: birth.focus.trim() || "整体人生结构", context: birth.context.trim() },
           chart: result,
         }),
       });
@@ -95,7 +110,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
         time: { hour: timeParts[0], minute: timeParts[1] },
         timeZone: "Asia/Shanghai", clockStandard: "china_standard_time",
         calculationTimeBasis: "china_standard_time", dayBoundary: "zi_hour_starts_next_day",
-        gender: birth.gender === "女" ? "woman" : "man", birthPlace: { city: birth.place.trim() },
+        gender: birth.gender === "女" ? "woman" : "man", birthPlace: { city: place },
         source: { timeSource: "S1", timePrecision: "P2", calendarConfirmed: true },
       });
       setChart(result); setError(""); void requestAnalysis(result);
@@ -111,7 +126,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
     return [
       "四境人生档案 基础结果",
       `称呼 ${birth.callName.trim()}`,
-      `出生资料 ${birth.date} ${birth.time} ${birth.place}`,
+      `出生资料 ${birth.date} ${birth.time} ${place}`,
       variant ? `四柱 ${variant.pillars.map((pillar) => pillar.name).join(" ")}` : "命盘状态 存在多个候选结果 需要核对出生时间",
       variant ? `日主 ${variant.pillars.find((pillar) => pillar.position === "day")?.stem || "待确认"}` : "",
       "说明 这是按固定历法口径生成的基础档案 不是已经完成现实核验的确定性结论",
@@ -123,6 +138,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   }
 
   function clear() {
+    setRegion({ province: "", city: "", district: "" }); setManualPlace(false);
     setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
     setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
   }
@@ -140,14 +156,24 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
 
       <div className="archive-form-card">
         {compact && <div className="archive-form-title"><span>免费基础档案</span><h2 id="archive-tool-title">建立你的四境档案</h2><p>先留下称呼<br />再建立属于你的四轴档案</p></div>}
-        <label className="archive-primary-field"><span>怎么称呼你 <small>称呼就是这份档案的识别代号</small></span><input value={birth.callName} onChange={(event) => update("callName", event.target.value)} placeholder="例如 均均" autoComplete="nickname" /></label>
+        <label className="archive-primary-field"><span>怎么称呼你 <small>称呼就是这份档案的识别代号</small></span><input value={birth.callName} onChange={(event) => update("callName", event.target.value)} placeholder="C07" autoComplete="nickname" /></label>
         <p className="archive-form-section-title">出生信息</p>
         <div className="archive-form-grid">
           <label><span>历法</span><select value={birth.calendar} onChange={(event) => update("calendar", event.target.value)}><option>公历</option><option>农历</option></select></label>
-          <label><span>出生地 <small>城市或区县即可</small></span><input value={birth.place} onChange={(event) => update("place", event.target.value)} placeholder="例如 上海" /></label>
           <label><span>出生日期</span><input type="date" value={birth.date} onChange={(event) => update("date", event.target.value)} /></label>
           <label><span>出生时刻</span><input type="time" value={birth.time} onChange={(event) => update("time", event.target.value)} /></label>
           <label><span>性别 <small>用于大运顺逆</small></span><select value={birth.gender} onChange={(event) => update("gender", event.target.value)}><option value="">请选择</option><option>男</option><option>女</option></select></label>
+          <fieldset className="archive-place archive-form-span">
+            <legend>出生地</legend>
+            {!manualPlace && <div className="archive-place-grid">
+              <label><span>省 / 自治区 / 直辖市</span><select value={region.province} onChange={(event) => updateRegion("province", event.target.value)}><option value="">请选择省级地区</option>{provinces.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
+              <label><span>市 / 自治州</span><select value={region.city} disabled={!region.province} onChange={(event) => updateRegion("city", event.target.value)}><option value="">请选择市级地区</option>{cities.map((item) => <option key={item.code} value={item.code}>{item.name === "市辖区" ? "市辖区（直属）" : item.name}</option>)}</select></label>
+              <label><span>县 / 区</span><select value={region.district} disabled={!region.city} onChange={(event) => updateRegion("district", event.target.value)}><option value="">请选择县或区</option>{districts.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
+            </div>}
+            {manualPlace && <label><span>手动填写出生地</span><input value={birth.place} onChange={(event) => update("place", event.target.value)} placeholder="填写省、市及县区或历史地名" /></label>}
+            <button className="archive-place-toggle" type="button" onClick={() => { setManualPlace(!manualPlace); update("place", ""); }}>{manualPlace ? "返回省市区选择" : "港澳台、未收录地区或历史地名？手动填写"}</button>
+            <small className="archive-place-note">当前按北京时间排盘；其他时区的出生资料暂不支持。</small>
+          </fieldset>
           <label className="archive-form-span"><span>想先了解的主题 <small>可选</small></span><input value={birth.focus} onChange={(event) => update("focus", event.target.value)} placeholder="例如 事业 关系 迁移或当前阶段" /></label>
           <label className="archive-form-span"><span>现实处境与经历 <small>越具体 越能避免泛泛而谈</small></span><textarea rows={5} value={birth.context} onChange={(event) => update("context", event.target.value)} placeholder="可以写最近几年重要的工作、关系、迁移、财务或情绪经历，以及你现在最想核对的问题。本站只在本次请求中使用，不作长期留存。" /></label>
         </div>
