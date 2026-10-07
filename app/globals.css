@@ -1336,15 +1336,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .pilot-anchors article { padding: 18px 14px; }
 }
 
-/* Keep the intake at the visual center of the three-part workbench. */
+/* Screenshot order: brand and compass, four-lens index, intake. */
 .premium-hero-workbench {
-  grid-template-columns: minmax(180px, 1fr) minmax(480px, 620px) minmax(180px, 1fr);
+  grid-template-columns: minmax(240px, .95fr) minmax(180px, .65fr) minmax(480px, 1.5fr);
   gap: clamp(24px, 3vw, 48px);
   padding: 44px clamp(24px, 4vw, 68px);
 }
-.premium-hero-workbench .workbench-index { grid-column: 1; grid-row: 1; padding: 24px 20px 24px 0; }
-.premium-hero-workbench > .archive-tool { grid-column: 2; grid-row: 1; min-width: 0; padding: 0; }
-.premium-hero-workbench .workbench-center { grid-column: 3; grid-row: 1; padding: 24px 0; }
+.premium-hero-workbench .workbench-index { grid-column: 2; grid-row: 1; padding: 24px 20px 24px 0; }
+.premium-hero-workbench > .archive-tool { grid-column: 3; grid-row: 1; min-width: 0; padding: 0; }
+.premium-hero-workbench .workbench-center { grid-column: 1; grid-row: 1; padding: 24px 0; }
 .premium-hero-workbench .workbench-center h1 { font-size: clamp(34px, 3.4vw, 54px); line-height: 1.3; letter-spacing: .02em; }
 .premium-hero-workbench .workbench-center .eyebrow { font-size: 8px; letter-spacing: .1em; line-height: 1.8; }
 .premium-hero-workbench .workbench-lead { font-size: 13px; line-height: 1.9; }
@@ -1383,9 +1383,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
   .premium-hero-workbench .workbench-center { order: 0; width: 100%; }
   .premium-hero-workbench .workbench-center h1 { font-size: 38px; }
   .premium-hero-workbench .workbench-lead { max-width: 440px; margin-top: 14px; }
-  .premium-hero-workbench > .archive-tool { order: 1; width: 100%; max-width: 620px; align-self: center; }
+  .premium-hero-workbench > .archive-tool { order: 2; width: 100%; max-width: 620px; align-self: center; }
   .premium-hero-workbench > .archive-tool--hero .archive-form-card { padding: 26px 20px; }
-  .premium-hero-workbench .workbench-index { order: 2; width: 100%; max-width: 620px; align-self: center; }
+  .premium-hero-workbench .workbench-index { order: 1; width: 100%; max-width: 620px; align-self: center; }
   .premium-hero-workbench .workbench-axis-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .premium-hero-workbench .workbench-axis-row { display: block; padding: 12px 8px; border-right: 1px solid var(--line); }
   .premium-hero-workbench .workbench-axis-row span small, .premium-hero-workbench .workbench-axis-row em { display: none; }
