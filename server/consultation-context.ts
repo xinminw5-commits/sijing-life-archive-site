@@ -1,6 +1,7 @@
 import type { DeterministicChartResult } from "../domain/chart/types.ts";
 import type { ConversationMessage, Reading } from "../lib/consultation.ts";
 import { ruleCatalog } from "./knowledge/rule-catalog.generated.ts";
+import { containsAcademicTerms } from "./plain-translation.ts";
 
 type Rule = typeof ruleCatalog[number];
 const families: Record<string, string[]> = {
@@ -33,6 +34,7 @@ export const CONSULTATION_INSTRUCTIONS = `你是四境人生档案的中文解�
 依据服务端重新计算的命盘与knowledge.rules，逐项比较适用条件与失效条件。说明支持哪个判断、不能支持什么；未经完整条件核查的结构保持假设。不能把候选检索当成已经成立的格局，不凭五行计数判强弱。具体年份先核对原局、大运和时间口径；资料不足就说明边界，不捏造流年计算。
 认真吸收用户反证，与上一轮不同之处明确修正。直接答案必须给有条件的取舍或问题定位；现实建议应对准用户已说的处境。有事实时至少联系一条事实，没有经历时用“如果…则…”区分两种现实情形。不要套话性格标签，不要把整条回答变成索要资料。
 输出600—1000字左右，不堆学术名词。专业术语第一次出现立即用白话解释。reasoning解释至少两处具体命盘事实及一项规则条件，并说出未知项；plainLanguage用生活语言进一步解释同一结论，不能只复述reasoning。example只作合成的情境示例，不是命中证据、真实客户或用户曾经历的事，指出哪些条件与用户相似、哪些不能类推。nextSteps给1—3项具体可执行的观察或选择，verification只问最能区分两种解释的一个问题。
+plainLanguage和example必须让完全不懂命理的人看懂，禁止出现月令、财星、食神、日主、用神、官杀、印星、气机、通关、身旺、身弱、成格、生财、格局、十神。把原文关系译成与本轮问题有关的日常含义，不能只给术语换一个句式。例如技能/经营讨论中的来源与归宿，应讲出“投入是否完成为成果、成果有没有人采用”，保留条件，不能编造本人经历。
 不作确定性疾病、灾祸、寿元、法律或投资判断，不恐吓，不将未来服务说成已经开放。不得编造规则、来源、用户经历或已验证案例，不声称规则预测已经验证。
 只输出一个JSON对象，无Markdown围栏，无内部推理草稿。格式：
 {"directAnswer":"先回答你（具体结论）","reasoning":"结合你的资料，说明依据、条件和不确定处","plainLanguage":"白话解读（进一步解释）","example":{"scenario":"合成情境示例","limit":"例子与本人不可直接等同的限制"},"nextSteps":["具体下一步"],"verification":"一个核验问题","chartAnchors":["从allowedChartAnchors原样选至少两个"],"ruleIds":["只引用本轮knowledge.rules中实际使用的至少两个编号"]}`;
@@ -51,6 +53,7 @@ export function parseReading(raw: string, context: ConsultationContext): Reading
   if (ids.length < 2 || ids.some(id => !context.knowledge.rules.some(r => r.id === id))) throw new Error("fabricated rule");
   const reasoning = field(value.reasoning, 80, 1800);
   if (chartAnchors.some(anchor => !reasoning.includes(anchor.slice(2)))) throw new Error("missing personal basis");
+  if (containsAcademicTerms(value.plainLanguage ?? "") || containsAcademicTerms(value.example?.scenario ?? "") || containsAcademicTerms(value.example?.limit ?? "")) throw new Error("untranslated terminology");
   return {
     directAnswer: field(value.directAnswer, 30, 1000), reasoning,
     plainLanguage: field(value.plainLanguage, 60, 1600),

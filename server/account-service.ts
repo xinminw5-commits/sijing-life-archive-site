@@ -219,7 +219,7 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
         const archive = await loadArchive(user); const snapshot = archive ? await loadSnapshot(user, archive) : null;
         if (!archive || !snapshot || !snapshot.report.includes(source)) fail(409, "报告已发生变化，请重新打开当前段落的译注");
         const cached = snapshot.translations?.[title];
-        if (cached?.source === source) return json({ translation: cached, saved: true });
+        if (cached?.source === source && cached.version === "plain.v2") return json({ translation: cached, saved: true });
         let translation: Translation;
         try { translation = deps.translate ? await deps.translate(source, title) : await translatePlain(source, title, env); } catch { fail(502, "白话译注暂未生成，没有使用追问次数，请稍后重试"); }
         await (await record(user, archive, { ...snapshot, translations: { ...snapshot.translations, [title]: translation } }, id(), "chart", token)).run();

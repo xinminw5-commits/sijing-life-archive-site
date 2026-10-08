@@ -250,7 +250,7 @@ function AnalysisDisplay({ report, translations, onTranslation, openExplanations
 
 function PlainTranslation({ block, translation, onTranslation }: { block: ReportBlock; translation?: Translation; onTranslation: (title: string, value: Translation) => void }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const active = translation?.source === block.body ? translation : undefined;
+  const active = translation?.source === block.body && translation.version === "plain.v2" ? translation : undefined;
   const attempted = useRef(false);
   const translate = useCallback(async () => {
     setBusy(true); setError("");

@@ -11,4 +11,4 @@ export type Reading = {
   knowledgeVersion: string;
 };
 export type ConversationMessage = { question: string; answer: string; reading?: Reading; savedAt?: string };
-export type Translation = { source: string; plainLanguage: string; example: string };
+export type Translation = { source: string; plainLanguage: string; example: string; version?: "plain.v2" };

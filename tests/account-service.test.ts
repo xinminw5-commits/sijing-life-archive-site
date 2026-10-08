@@ -194,7 +194,7 @@ test("translation is bound to the saved source, cached encrypted and never spend
   const f = fixture(); const a = await f.login("translation@example.com"), b = await f.login("other@example.com");
   const source = "月令财为主，食神作为来源；但是否有承载和连续路径仍需核验，不能从一颗财星推断经营收益。";
   await f.call("save", { birth, report: `结构境 观其序\n${source}` }, a);
-  let calls = 0; const deps = { ...f.deps, translate: async () => { calls++; return { source, plainLanguage: "合成译文", example: "合成类比" }; } };
+  let calls = 0; const deps = { ...f.deps, translate: async () => { calls++; return { source, plainLanguage: "合成译文", example: "合成类比", version: "plain.v2" as const }; } };
   const req = () => accountRequest(f.request("translate", { title: "结构境 观其序", source }, a), f.env, deps);
   assert.equal((await req()).status, 200); assert.equal((await req()).status, 200); assert.equal(calls, 1);
   const me = await (await f.call("me", undefined, a)).json(); assert.equal(me.remaining, 3); assert.equal(me.snapshot.translations["结构境 观其序"].source, source);
@@ -237,4 +237,13 @@ test("structured reply is persisted with plain language, sources and saved recei
     const me = await (await f.call("me", undefined, cookie)).json(); assert.equal(me.snapshot.messages.length, 1); assert.equal(me.snapshot.messages[0].reading.sources[1].id, "DT002");
     assert.ok(!JSON.stringify(f.sqlite.prepare("SELECT payload_ciphertext FROM archive_records").all()).includes("投入为何"));
   } finally { globalThis.fetch = original; }
+});
+
+test("plain translation rejects academic paraphrases and accepts everyday meaning with uncertainty", async () => {
+  const { parseTranslation } = await import("../server/plain-translation.ts");
+  const source = "合成原文：日主能否承担食神生财的连续路径尚未核验，不可断定经营成功。";
+  const untranslated = { plainLanguage: "日主是否有足够承载，食神能不能输出并被财星接住，还没有核实。".repeat(3), example: "财星接住食神，就像产出接上需求，这是合成例子。" };
+  assert.throws(() => parseTranslation(JSON.stringify(untranslated), source), /术语/);
+  const translated = { plainLanguage: "这段话还没有判断你经营会成功。它需要核实的是：你有没有足够精力把事情完成，技能有没有做成成果，成果有没有人需要并采用。这些环节没有核实之前，只能说存在一种可能，不能当成已经发生的事。", example: "比如样稿做完但没人验收，与根本没做完是两种情况。这里只解释这两个环节，不是你的经历。" };
+  assert.equal(parseTranslation(JSON.stringify(translated), source).version, "plain.v2");
 });
