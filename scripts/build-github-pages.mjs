@@ -33,11 +33,14 @@ function rewrite(html, prefix) {
 
 await rm(pages, { recursive: true, force: true });
 await mkdir(join(pages, "pilot"), { recursive: true });
+await mkdir(join(pages, "preview"), { recursive: true });
 await cp(join(dist, "client", "assets"), join(pages, "assets"), { recursive: true });
 await cp(join(project, "public", "favicon.svg"), join(pages, "favicon.svg"));
 await cp(join(project, "public", "og.png"), join(pages, "og.png"));
 
 await writeFile(join(pages, "index.html"), rewrite(await render("/"), "./"));
 await writeFile(join(pages, "pilot", "index.html"), rewrite(await render("/pilot"), "../"));
+
+await writeFile(join(pages, "preview", "index.html"), rewrite(await render("/preview"), "../"));
 
 console.log(`Cloudflare Pages output written to ${relative(project, pages)}`);

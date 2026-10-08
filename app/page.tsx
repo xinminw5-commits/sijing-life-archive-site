@@ -16,7 +16,7 @@ const axes = [
 
 export default function Home() {
   return <main className="archive-home">
-    <header className="site-header archive-header"><a className="brand" href="#top" aria-label="四境人生档案首页"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>SIJING ARCHIVE</small></span></a><nav aria-label="主导航"><a href="#method">四境体系</a><a href="#boundary">解读边界</a><a className="nav-cta" href="#intake">建立档案</a></nav></header>
+    <header className="site-header archive-header"><a className="brand" href="#top" aria-label="四境人生档案首页"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>SIJING ARCHIVE</small></span></a><nav aria-label="主导航"><a href="#method">四境体系</a><a href="/preview/">账号预览</a><a className="nav-cta" href="#intake">建立档案</a></nav></header>
     <div className="archive-scroll-pages">
     <section className="archive-intro-screen" id="top">
       <div className="workbench-center">
