@@ -1,7 +1,8 @@
 "use client";
 
+import { ScrollLink } from "../ScrollLink";
 import { AccountTools } from "./AccountTools";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { provinces, resolveBirthPlace, type RegionSelection } from "../../lib/regions/index.ts";
 import { calculateDeterministicChart, ChartCalculationError, type DeterministicChartResult } from "../../domain/chart/index.ts";
 
@@ -43,6 +44,7 @@ function parseReport(report: string): ReportBlock[] {
 }
 
 export function PilotIntake({ compact = false }: { compact?: boolean }) {
+  const generation = useRef(0);
   const [birth, setBirth] = useState({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
   const [region, setRegion] = useState<RegionSelection>({ province: "", city: "", district: "" });
   const [manualPlace, setManualPlace] = useState(false);
@@ -61,6 +63,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const ready = Boolean(birth.callName.trim() && birth.date && birth.time && place && birth.gender && birth.consent);
 
   function update(key: keyof typeof birth, value: string | boolean) {
+    generation.current++; setAnalysisLoading(false);
     setBirth((current) => ({ ...current, [key]: value }));
     setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
   }
@@ -73,7 +76,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
     update("place", "");
   }
 
-  async function requestAnalysis(result: DeterministicChartResult) {
+  async function requestAnalysis(result: DeterministicChartResult, version: number) {
     setAnalysisLoading(true);
     try {
       const response = await fetch("/api/analyze", {
@@ -92,11 +95,11 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
         throw new Error("分析接口暂时没有返回有效结果，请刷新页面后重试");
       }
       if (!response.ok || !payload.report) throw new Error(payload.error || "补充说明暂时无法生成");
-      setAnalysis(payload.report);
+      if (generation.current === version) setAnalysis(payload.report);
     } catch (requestError) {
-      setAnalysisError(requestError instanceof Error ? requestError.message : "补充说明暂时无法生成");
+      if (generation.current === version) setAnalysisError(requestError instanceof Error ? requestError.message : "补充说明暂时无法生成");
     } finally {
-      setAnalysisLoading(false);
+      if (generation.current === version) setAnalysisLoading(false);
     }
   }
 
@@ -114,7 +117,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
         gender: birth.gender === "女" ? "woman" : "man", birthPlace: { city: place },
         source: { timeSource: "S1", timePrecision: "P2", calendarConfirmed: true },
       });
-      setChart(result); setError(""); void requestAnalysis(result);
+      setChart(result); setError(""); void requestAnalysis(result, ++generation.current);
     } catch (calculationError) {
       setChart(null);
       setError(calculationError instanceof ChartCalculationError ? calculationError.message : "这组资料暂时无法计算 请检查日期和时间");
@@ -157,7 +160,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
 
       <div className="archive-form-card">
         {compact && <div className="archive-form-title"><span>免费基础档案</span><h2 id="archive-tool-title">建立你的四境档案</h2><p>先留下称呼<br />再建立属于你的四轴档案</p></div>}
-        <AccountTools birth={{ ...birth, place }} report={analysis} onRestore={saved => { setBirth(saved.birth); setManualPlace(true); setChart(saved.chart as DeterministicChartResult); setAnalysis(saved.report); }} />
+        <AccountTools birth={{ ...birth, place }} report={analysis} onRegisterName={name => setBirth(current => ({ ...current, callName: current.callName || name }))} onLogout={() => { generation.current++; setAnalysisLoading(false); setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false }); setRegion({ province: "", city: "", district: "" }); setChart(null); setAnalysis(""); setAnalysisError(""); setOpenExplanations({}); }} onRestore={saved => { generation.current++; setAnalysisLoading(false); setBirth(saved.birth); setManualPlace(true); setChart(saved.chart as DeterministicChartResult); setAnalysis(saved.report); }} />
         <label className="archive-primary-field"><span>怎么称呼你 <small>称呼就是这份档案的识别代号</small></span><input value={birth.callName} onChange={(event) => update("callName", event.target.value)} placeholder="C07" autoComplete="nickname" /></label>
         <p className="archive-form-section-title">出生信息</p>
         <div className="archive-form-grid">
@@ -179,7 +182,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
           <label className="archive-form-span"><span>想先了解的主题 <small>可选</small></span><input value={birth.focus} onChange={(event) => update("focus", event.target.value)} placeholder="例如 事业 关系 迁移或当前阶段" /></label>
           <label className="archive-form-span"><span>现实处境与经历 <small>越具体 越能避免泛泛而谈</small></span><textarea rows={5} value={birth.context} onChange={(event) => update("context", event.target.value)} placeholder="可以写最近几年重要的工作、关系、迁移、财务或情绪经历，以及你现在最想核对的问题。登录并主动保存后，下次可以继续。" /></label>
         </div>
-        <label className="archive-consent"><input type="checkbox" checked={birth.consent} onChange={(event) => update("consent", event.target.checked)} /><span>我同意使用本次出生信息生成档案<br />登录后可主动保存；保存仅用于个人档案及均均服务复核，不用于研究或公开展示</span></label>
+        <label className="archive-consent"><input type="checkbox" checked={birth.consent} onChange={(event) => update("consent", event.target.checked)} /><span>我同意使用本次出生信息生成档案<br />登录后生成的报告与讨论会保存到个人账户，仅用于个人档案及均均服务复核，可导出或删除，不用于研究或公开展示</span></label>
         <div className="archive-generate-row"><button className="button button-primary" type="button" onClick={generate} disabled={!ready}>生成我的基础档案</button>{!ready && <small>请留下称呼并补全出生信息与授权</small>}</div>
         {error && <p className="archive-error" role="alert">{error}</p>}
       </div>
@@ -191,7 +194,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
           <div className="archive-axis-grid">{axisCopy.map(([title, body]) => <article key={title}><span>{title}</span><p>{body}</p></article>)}</div>
           <p className="archive-boundary">日主是结构计算中的日干 不等于完整性格结论<br />具体年份 关系和现实问题 需要带着事实再做核验</p>
         </> : <p className="archive-boundary">当前存在多个候选命盘 网页不会替你强行选定其中一个<br />先核对出生时间 再决定是否深入</p>}
-        <div className="archive-result-actions"><button type="button" onClick={copyResult}>{copied ? "已复制" : "复制基础档案"}</button><a href="#deeper">带着具体问题找均均</a></div>
+        <div className="archive-result-actions"><button type="button" onClick={copyResult}>{copied ? "已复制" : "复制基础档案"}</button><ScrollLink target="deeper">带着具体问题找均均</ScrollLink></div>
         <section className="archive-deeper" id="deeper">
           <div className="archive-deeper-heading"><div><p className="eyebrow"><span /> 深入阅读</p><h4>进一步解读</h4></div><span>{analysisLoading ? "生成中" : analysis ? "已生成" : "等待生成"}</span></div>
           {analysisLoading && <div className="archive-analysis-loading"><i />正在整理命盘结构与人生主题<br />请稍候</div>}

@@ -2,54 +2,109 @@
 import { useEffect, useRef, useState } from "react";
 import type { Birth } from "../../server/account-service";
 type Saved = { birth: Birth; chart: unknown; report: string; messages: { question: string; answer: string }[] };
-export function AccountTools({ birth, report, onRestore }: { birth: Birth; report: string; onRestore: (saved: Saved) => void }) {
-  const [signedIn, setSignedIn] = useState(false);
-  const [storageAvailable, setStorageAvailable] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"login" | "chat">("login");
+type Session = { account: { displayName: string }; snapshot: Saved | null; remaining: number; storageAvailable: boolean };
+type HistoryItem = { id: string; at: string; type: string; callName: string; focus: string; messages: number };
+const fingerprint = (birth: Birth, report: string) => JSON.stringify({ birth, report });
+export function AccountTools({ birth, report, onRestore, onRegisterName, onLogout }: { birth: Birth; report: string; onRestore: (saved: Saved) => void; onRegisterName: (name: string) => void; onLogout: () => void }) {
+  const [signedIn, setSignedIn] = useState(false); const [storageAvailable, setStorageAvailable] = useState(false);
+  const [loading, setLoading] = useState(true); const [displayName, setDisplayName] = useState("");
+  const [open, setOpen] = useState(false); const [mode, setMode] = useState<"auth" | "chat" | "history">("auth");
+  const [authMode, setAuthMode] = useState<"register" | "login">("register");
   const [email, setEmail] = useState(""); const [code, setCode] = useState(""); const [sent, setSent] = useState(false);
+  const [newName, setNewName] = useState(""); const [registrationConsent, setRegistrationConsent] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState("");
-  const [remaining, setRemaining] = useState(3); const [question, setQuestion] = useState("");
-  const [messages, setMessages] = useState<Saved["messages"]>([]);
+  const [remaining, setRemaining] = useState(3); const [question, setQuestion] = useState(""); const [messages, setMessages] = useState<Saved["messages"]>([]);
+  const [items, setItems] = useState<HistoryItem[]>([]); const [cursor, setCursor] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ at: string; snapshot: Saved } | null>(null);
   const [deletePrompt, setDeletePrompt] = useState(false); const [confirmation, setConfirmation] = useState("");
   const [retry, setRetry] = useState<{ question: string; id: string } | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null); const onRestoreRef = useRef(onRestore); const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
+  const dialog = useRef<HTMLDialogElement>(null); const end = useRef<HTMLDivElement>(null);
+  const restore = useRef(onRestore); const currentBirth = useRef(birth); const lastSaved = useRef(""); const epoch = useRef(0);
+  useEffect(() => { restore.current = onRestore; currentBirth.current = birth; }, [onRestore, birth]);
   const renderMirror = typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com");
   async function api(path: string, body?: unknown) {
     const response = await fetch(`/api/account/${path}`, { method: body === undefined ? "GET" : "POST", headers: body === undefined ? {} : { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
     let value; try { value = await response.json(); } catch { throw new Error("当前地址尚未连接账号服务，请使用主站登录。"); }
     if (!response.ok) { if (response.status === 401) setSignedIn(false); throw new Error(value.error || "请求暂未完成，请重试"); } return value;
   }
-  async function me(restore: boolean) { const value = await api("me"); setSignedIn(true); setStorageAvailable(value.storageAvailable === true); setRemaining(value.remaining); setMessages(value.snapshot?.messages ?? []); if (restore && value.snapshot) onRestoreRef.current(value.snapshot); }
-  useEffect(() => { if (!renderMirror) { let active = true; void fetch("/api/account/status").then(r => r.json()).then(value => { if (active) setStorageAvailable(value.storageAvailable === true); if (active && value.available) return fetch("/api/account/me").then(r => { if (!r.ok) throw new Error("No session"); return r.json(); }).then(saved => { if (!active) return; setSignedIn(true); setRemaining(saved.remaining); setMessages(saved.snapshot?.messages ?? []); if (saved.snapshot) onRestoreRef.current(saved.snapshot); }); }).catch(() => {}); return () => { active = false; }; } }, [renderMirror]); // Restore only after a server-authenticated session.
+  function applySession(value: Session, shouldRestore: boolean) {
+    setSignedIn(true); setDisplayName(value.account.displayName); setStorageAvailable(value.storageAvailable); setRemaining(value.remaining); setMessages(value.snapshot?.messages ?? []);
+    if (shouldRestore && value.snapshot) { lastSaved.current = fingerprint(value.snapshot.birth, value.snapshot.report); restore.current(value.snapshot); }
+  }
+  async function me(shouldRestore: boolean) { const version = epoch.current; const value = await api("me"); if (version === epoch.current) applySession(value, shouldRestore); }
+  useEffect(() => {
+    if (renderMirror) return;
+    let active = true; const version = epoch.current;
+    void fetch("/api/account/status").then(r => r.json()).then(async value => {
+      if (!active || version !== epoch.current) return;
+      setStorageAvailable(value.storageAvailable === true);
+      if (value.available) { const response = await fetch("/api/account/me"); if (response.ok) { const saved = await response.json(); if (active && version === epoch.current) applySession(saved, true); } }
+    }).catch(() => {}).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [renderMirror]); // Server cookie identifies the account; personal data is never stored in localStorage.
+  useEffect(() => { window.dispatchEvent(new CustomEvent("sijing-account-state", { detail: { signedIn, displayName } })); }, [signedIn, displayName]);
+  useEffect(() => {
+    function navigate(event: Event) { const intent = (event as CustomEvent).detail; if (intent === "auth") { setAuthMode("register"); show("auth"); } else show("history"); }
+    window.addEventListener("sijing-account-open", navigate); return () => window.removeEventListener("sijing-account-open", navigate);
+  });
   useEffect(() => { if (open) dialog.current?.showModal(); else dialog.current?.close(); }, [open]);
   useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [messages.length]);
+  useEffect(() => {
+    const data = currentBirth.current;
+    if (!signedIn || !storageAvailable || !report || !data.consent || !data.date || !data.time || !data.place || !data.gender || !data.callName.trim()) return;
+    const signature = fingerprint(data, report); if (lastSaved.current === signature) return;
+    lastSaved.current = signature; const version = epoch.current; let active = true;
+    void api("save", { birth: data, report }).then(() => { if (active && version === epoch.current) setNotice("报告已保存到个人账户，下次打开可继续查看。"); }).catch(e => { if (active && version === epoch.current) { lastSaved.current = ""; setError(`${e.message} 请点击保存当前档案重试。`); } });
+    return () => { active = false; };
+  }, [report, signedIn, storageAvailable]);
   async function act(task: () => Promise<void>) { setBusy(true); setError(""); try { await task(); } catch (e) { setError(e instanceof Error ? e.message : "暂时未完成，请重试"); } finally { setBusy(false); } }
-  function show(next: "login" | "chat") {
-    if (renderMirror) { window.location.href = "https://sijinglife.com/#intake"; return; }
-    setError(""); setMode(signedIn ? next : "login"); setOpen(true);
+  async function history(more = false) { const value = await api(`history${more && cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`); setItems(old => more ? [...old, ...value.items] : value.items); setCursor(value.nextCursor); }
+  function show(next: "auth" | "chat" | "history") {
+    if (renderMirror) { window.location.href = "https://sijinglife.com/"; return; }
+    setError(""); setMode(signedIn ? (next === "auth" ? "history" : next) : "auth"); setSelected(null); setOpen(true);
+    if (signedIn && next !== "chat") void act(() => history());
   }
-  async function save() { if (!signedIn) { show("login"); return; } await act(async () => { await api("save", { birth, report }); setNotice("档案已保存，下次登录可继续。"); await me(false); }); }
+  async function save() { if (!signedIn) { show("auth"); return; } await act(async () => { await api("save", { birth, report }); lastSaved.current = fingerprint(birth, report); setNotice("当前档案已保存。"); await me(false); }); }
   async function sendQuestion() {
     if (!question.trim() || busy || !remaining) return;
     const requestId = retry?.question === question ? retry.id : crypto.randomUUID(); setRetry({ question, id: requestId });
     await act(async () => { await api("chat", { question, requestId }); await me(false); setQuestion(""); setRetry(null); });
   }
+  async function logout() { await api("logout", {}); epoch.current++; setSignedIn(false); setDisplayName(""); setMessages([]); setItems([]); setSelected(null); setQuestion(""); setRetry(null); setEmail(""); setCode(""); setSent(false); setDeletePrompt(false); lastSaved.current = ""; setOpen(false); onLogout(); setNotice("已退出登录。个人档案保留在账户中。"); }
+  function switchAuth(next: "register" | "login") { setAuthMode(next); setSent(false); setCode(""); setError(""); }
   return <div className="account-inline">
-    <div className="account-inline-actions">{(!signedIn || storageAvailable) && <button type="button" onClick={() => signedIn ? void save() : show("login")} disabled={busy}>{signedIn ? "保存档案" : storageAvailable ? "登录保存档案" : "邮箱登录"}</button>}{signedIn && <>{storageAvailable && <><button type="button" onClick={() => show("chat")}>继续讨论</button><a href="/api/account/export">导出</a><button type="button" onClick={() => setDeletePrompt(!deletePrompt)}>删除档案</button></>}<button type="button" onClick={() => void act(async () => { await api("logout", {}); setSignedIn(false); setMessages([]); setNotice("已退出账号。"); })}>退出</button></>}</div>
-    {signedIn && !storageAvailable && <small>邮箱已登录，档案保存和讨论正在准备。</small>}
-    {signedIn && storageAvailable && <small>已登录 · 资料仅用于你的档案与解答，不加入研究或公开展示。授权均均为服务复核查看，访问会留痕。</small>}
-    {deletePrompt && signedIn && <div className="account-delete"><p>删除后在线档案和对话无法恢复，历史备份按服务商保留窗口到期清理。填写「删除档案」确认。</p><input aria-label="删除确认" value={confirmation} onChange={e => setConfirmation(e.target.value)} /><button disabled={busy || confirmation !== "删除档案"} onClick={() => void act(async () => { const value = await api("delete", { confirm: confirmation }); setMessages([]); setDeletePrompt(false); setConfirmation(""); setNotice(value.note); })}>确认删除</button></div>}
+    {signedIn && <p className="account-owner">{displayName}的个人账户</p>}
+    <div className="account-inline-actions">
+      {!signedIn ? <button type="button" onClick={() => show("auth")} disabled={(loading && !renderMirror) || busy}>注册 / 登录</button> : <>
+        {storageAvailable && <><button type="button" onClick={() => void save()} disabled={busy}>保存当前档案</button><button type="button" onClick={() => show("history")}>历史记录</button><button type="button" onClick={() => show("chat")}>继续讨论</button><a href="/api/account/export">导出档案</a><button type="button" onClick={() => setDeletePrompt(!deletePrompt)}>删除档案</button></>}
+        <button type="button" disabled={busy} onClick={() => void act(logout)}>退出登录</button>
+      </>}
+    </div>
+    {!signedIn && <small>注册个人账户，保存你的档案、报告与对话。</small>}
+    {signedIn && storageAvailable && <small>报告和对话保存于你的账户；有效登录期间，再次打开会自动加载。资料仅用于个人档案与均均服务复核。</small>}
+    {signedIn && !storageAvailable && <small>账户已登录，档案服务暂不可用。</small>}
+    {deletePrompt && signedIn && <div className="account-delete"><p>删除全部在线档案与对话，账户保留；历史备份最迟30天到期。填写「删除档案」确认。</p><input aria-label="删除确认" value={confirmation} onChange={e => setConfirmation(e.target.value)} /><button disabled={busy || confirmation !== "删除档案"} onClick={() => void act(async () => { const value = await api("delete", { confirm: confirmation }); setMessages([]); setItems([]); setSelected(null); setDeletePrompt(false); setConfirmation(""); lastSaved.current = ""; onLogout(); setNotice(value.note); })}>确认删除</button></div>}
     {notice && <p role="status">{notice}</p>}{error && !open && <p role="alert" className="archive-error">{error}</p>}
     <dialog className="account-dialog" ref={dialog} aria-labelledby="account-dialog-title" onCancel={() => setOpen(false)} onClose={() => setOpen(false)}>
-      <div className="account-dialog-head"><h3 id="account-dialog-title">{mode === "login" ? "继续你的档案" : "把问题带回现实"}</h3><button aria-label="关闭窗口" onClick={() => setOpen(false)}>✕</button></div>
-      {mode === "login" ? <form className="account-login" onSubmit={e => { e.preventDefault(); void act(async () => { await api("verify", { email, code }); await me(true); setCode(""); setSent(false); setOpen(false); setNotice("邮箱验证成功，已登录。"); }); }}>
-        <p>用邮箱登录，找回自己的资料和上次讨论。</p><label>邮箱<input type="email" autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); setSent(false); }} required maxLength={254} /></label>
-        <button type="button" disabled={busy || !email.trim()} onClick={() => void act(async () => { await api("send", { email }); setSent(true); })}>{sent ? "重新发送验证码" : "发送验证码"}</button>
-        {sent && <><p>验证码已发送，10分钟内有效，请检查邮箱。</p><label>验证码<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e => setCode(e.target.value)} required /></label><button type="submit" disabled={busy || code.length !== 6}>登录</button></>}
-        <small>首次验证邮箱会建立账号。只有主动保存并授权后，出生资料才会留档。</small>
-      </form> : <><div className="account-chat-history" aria-live="polite"><p className="account-chat-note">AI 解答 · 结合已保存资料与现实反馈，判断仍可核对和修正。</p>{messages.map((message, index) => <div key={index}><p className="account-question">{message.question}</p><p className="account-answer">{message.answer}</p></div>)}{!remaining && <div className="account-complete"><b>本次讨论已完成</b><p>档案与对话已保存，可随时回来查看。专题解读和均均复核将在开放后接续。</p></div>}<div ref={end} /></div><form className="account-composer" onSubmit={e => { e.preventDefault(); void sendQuestion(); }}><label>你想补充或追问什么？<textarea rows={3} value={question} maxLength={2000} disabled={busy || !remaining} onChange={e => setQuestion(e.target.value)} placeholder="哪里吻合、哪里不吻合？可以从一段具体经历说起。" /></label><div><small>{remaining ? `还可继续 ${remaining} 次` : "本次免费讨论已结束"}</small><button disabled={busy || !remaining || !question.trim()}>{busy ? "正在整理回答…" : "发送"}</button></div></form></>}
+      <div className="account-dialog-head"><h3 id="account-dialog-title">{mode === "auth" ? authMode === "register" ? "注册个人账户" : "登录个人账户" : mode === "history" ? "我的历史记录" : "继续讨论"}</h3><button aria-label="关闭窗口" onClick={() => setOpen(false)}>✕</button></div>
+      {mode === "auth" ? <form className="account-login" onSubmit={e => { e.preventDefault(); void act(async () => { const value = await api("verify", { email, code, action: authMode, displayName: newName, registrationConsent }); epoch.current++; await me(true); if (value.registered) onRegisterName(newName.trim()); setCode(""); setSent(false); setOpen(false); setNotice(value.registered ? "个人账户已建立，填写资料后即可生成并保存档案。" : "已登录，个人档案和对话已加载。"); }); }}>
+        <div className="account-auth-tabs" aria-label="账户操作"><button type="button" aria-pressed={authMode === "register"} onClick={() => switchAuth("register")}>注册</button><button type="button" aria-pressed={authMode === "login"} onClick={() => switchAuth("login")}>登录</button></div>
+        <p>{authMode === "register" ? "建立属于你的个人账户，留存每次报告与讨论。" : "登录后继续查看你的档案、报告与历史讨论。"}</p>
+        {authMode === "register" && <label>怎么称呼你<input autoComplete="nickname" value={newName} onChange={e => setNewName(e.target.value)} required maxLength={40} /></label>}
+        <label>邮箱<input type="email" autoComplete="email" value={email} onChange={e => { setEmail(e.target.value); setSent(false); setCode(""); }} required maxLength={254} /></label>
+        <button type="button" disabled={busy || !email.trim()} onClick={() => void act(async () => { await api("send", { email }); setSent(true); })}>{busy ? "正在发送…" : sent ? "重新发送验证码" : "发送验证码"}</button>
+        {sent && <><p>验证码已发送，10分钟内有效，请检查邮箱。</p><label>验证码<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={code} onChange={e => setCode(e.target.value)} required /></label></>}
+        {authMode === "register" && <label className="account-consent"><input type="checkbox" checked={registrationConsent} onChange={e => setRegistrationConsent(e.target.checked)} required /><span>创建个人账户。出生资料将在我同意生成并保存档案后留存，仅用于个人档案与服务复核。</span></label>}
+        {sent && <button type="submit" disabled={busy || code.length !== 6 || (authMode === "register" && (!newName.trim() || !registrationConsent))}>{busy ? "正在处理…" : authMode === "register" ? "创建账户" : "登录"}</button>}
+        <small>邮箱用于验证账户身份，无需另设密码。此设备可保持登录30天；退出后需要重新验证。</small>
+      </form> : mode === "history" ? <div className="account-history">
+        {selected ? <><button type="button" onClick={() => setSelected(null)}>返回历史列表</button><p>{new Date(selected.at).toLocaleString("zh-CN")} · {selected.snapshot.birth.callName}</p><h4>{selected.snapshot.birth.focus || "基础人生档案"}</h4><div className="account-saved-report">{selected.snapshot.report || "本次仅保存了出生资料与基础排盘。"}</div>{selected.snapshot.messages.map((message, index) => <div key={index}><p className="account-question">{message.question}</p><p className="account-answer">{message.answer}</p></div>)}</> : <>
+          <p>报告和讨论按保存时间排列。查看旧记录不会替换你当前的档案。</p>
+          {!items.length && !busy && <p>还没有历史记录。生成报告后，会保存到这里。</p>}
+          {items.map(item => <button className="account-history-item" type="button" disabled={busy} key={item.id} onClick={() => void act(async () => { setSelected(await api(`history?id=${encodeURIComponent(item.id)}`)); })}><span>{item.focus || "基础人生档案"} · {item.type === "consultation" ? "讨论" : "报告"}</span><small>{new Date(item.at).toLocaleString("zh-CN")} · {item.messages}条解答</small></button>)}
+          {cursor && <button type="button" disabled={busy} onClick={() => void act(() => history(true))}>查看更多</button>}{busy && <p role="status">正在加载…</p>}
+        </>}
+      </div> : <><div className="account-chat-history" aria-live="polite"><p className="account-chat-note">AI解答结合当前档案与现实反馈，讨论会自动保存。</p>{messages.map((message, index) => <div key={index}><p className="account-question">{message.question}</p><p className="account-answer">{message.answer}</p></div>)}{!remaining && <div className="account-complete"><b>本次讨论已完成</b><p>档案与对话已保存，可随时回来查看。专题解读和均均复核将在开放后接续。</p></div>}<div ref={end} /></div><form className="account-composer" onSubmit={e => { e.preventDefault(); void sendQuestion(); }}><label>你想补充或追问什么？<textarea rows={3} value={question} maxLength={2000} disabled={busy || !remaining} onChange={e => setQuestion(e.target.value)} placeholder="哪里吻合、哪里不吻合？可以从一段具体经历说起。" /></label><div><small>{remaining ? `还可继续 ${remaining} 次` : "本次免费讨论已结束"}</small><button disabled={busy || !remaining || !question.trim()}>{busy ? "正在整理回答…" : "发送"}</button></div></form></>}
       {error && <p role="alert" className="archive-error account-dialog-error">{error}</p>}
     </dialog>
   </div>;

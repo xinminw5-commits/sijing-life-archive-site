@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ScrollLink } from "./ScrollLink";
 import { HeroSignals } from "./HeroSignals";
 import { PilotIntake } from "./pilot/PilotIntake";
 
@@ -16,7 +17,7 @@ const axes = [
 
 export default function Home() {
   return <main className="archive-home">
-    <header className="site-header archive-header"><a className="brand" href="#top" aria-label="四境人生档案首页"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>SIJING ARCHIVE</small></span></a><nav aria-label="主导航"><a href="#method">四境体系</a><a href="#intake">我的档案</a><a className="nav-cta" href="#intake">建立档案</a></nav></header>
+    <header className="site-header archive-header"><ScrollLink className="brand" target="top" label="四境人生档案首页"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>SIJING ARCHIVE</small></span></ScrollLink><nav aria-label="主导航"><ScrollLink target="method">四境体系</ScrollLink><ScrollLink target="intake" accountIntent="history">我的档案</ScrollLink><ScrollLink target="intake" accountIntent="auth">注册 / 登录</ScrollLink><ScrollLink className="nav-cta" target="intake">建立档案</ScrollLink></nav></header>
     <div className="archive-scroll-pages">
     <section className="archive-intro-screen" id="top">
       <div className="workbench-center">
@@ -35,6 +36,6 @@ export default function Home() {
     </div>
     </div>
     <section className="archive-boundary-section" id="boundary"><div><p className="eyebrow light"><span /> 解读边界</p><h2>有依据<br />也保留边界</h2></div><div className="archive-boundary-list"><p><b>不掩盖不确定性</b>出生时间或判断条件存在边界时 会明确说明 不用笃定语气替代证据</p><p><b>不利用恐惧成交</b>不渲染灾祸 疾病和危险 也不替代医疗 法律与财务等专业意见</p><p><b>深入解读需要真实处境</b>事业 关系 迁移和具体年份 需要结合你的现实问题 由均均继续分析</p></div></section>
-    <footer><a className="brand footer-brand" href="#top"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>结构　时序　气机　人生</small></span></a><p>理解命盘<br />也尊重人生的复杂与选择</p><a href="#top">回到顶部</a></footer>
+    <footer><ScrollLink className="brand footer-brand" target="top"><span className="brand-seal">四</span><span><strong>四境人生档案</strong><small>结构　时序　气机　人生</small></span></ScrollLink><p>理解命盘<br />也尊重人生的复杂与选择</p><ScrollLink target="top">回到顶部</ScrollLink></footer>
   </main>;
 }

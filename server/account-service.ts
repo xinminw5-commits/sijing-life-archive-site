@@ -72,7 +72,7 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
   const db = env.DB!; const secret = env.ACCOUNT_SECRET!; const master = bytes(env.ARCHIVE_KEY!);
   const sql = (query: string, ...values: (string | number | null)[]) => db.prepare(query).bind(...values);
   const hash = (text: string) => digest(secret, text);
-  const cookie = (token: string, maxAge = 7 * 86400) => `${COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+  const cookie = (token: string, maxAge = 30 * 86400) => `${COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
   async function principal(): Promise<User> {
     const token = request.headers.get("Cookie")?.split(";").map(x => x.trim()).find(x => x.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1);
     if (!token || token.length > 100) fail(401, "请先登录，再继续保存或追问");
@@ -126,20 +126,30 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
     }
     if (path === "verify" && request.method === "POST") {
       const body = await boundedBody(request); const emailDigest = await hash(`email:${emailOf(body.email)}`); const code = string(body.code, 6);
+      const action = body.action;
+      if (action !== "register" && action !== "login") fail(400, "请选择注册或登录");
+      const displayName = action === "register" ? string(body.displayName, 40) : "";
+      if (action === "register" && body.registrationConsent !== true) fail(400, "请确认创建个人账户");
       if (!/^\d{6}$/.test(code)) fail(400, "请填写六位验证码");
       const row = await sql("UPDATE login_codes SET attempts=attempts+1,used=CASE WHEN code_digest=? THEN 1 ELSE used END WHERE email_digest=? AND expires_at>? AND attempts<5 AND used=0 AND ready=1 RETURNING used", await hash(`otp:${emailDigest}:${code}`), emailDigest, now).first<{ used: number }>();
       if (!row?.used) fail(400, "验证码错误或已失效，请重新获取");
       const accountId = await hash(`account:${emailDigest}`);
+      const existing = await sql("SELECT id,status FROM accounts WHERE id=?", accountId).first<{ id: string; status: string }>();
+      if (existing?.status !== undefined && existing.status !== "active") fail(403, "此账户已注销，不能继续登录");
+      if (action === "login" && !existing) fail(404, "这个邮箱还没有个人账户，请先注册并重新获取验证码");
+      if (action === "register" && existing) fail(409, "这个邮箱已经注册，请切换登录并重新获取验证码");
+      const encryptedProfile = action === "register" ? JSON.stringify(await seal(master, { displayName }, `profile:${accountId}`)) : null;
       const token = b64(crypto.getRandomValues(new Uint8Array(32)));
       await db.batch([
         sql("INSERT OR IGNORE INTO accounts(id,role,status,default_storage_mode,created_at,updated_at) VALUES(?,'user','active','personal_archive',?,?)", accountId, at, at),
         sql("INSERT OR IGNORE INTO external_identities(id,account_id,issuer,subject_digest,linked_at) VALUES(?,?,'sijing-email-otp',?,?)", id(), accountId, emailDigest, at),
+        ...(action === "register" ? [sql("UPDATE accounts SET profile_ciphertext=? WHERE id=? AND profile_ciphertext IS NULL", encryptedProfile, accountId)] : []),
         sql("INSERT OR IGNORE INTO account_usage(account_id) VALUES(?)", accountId),
-        sql("INSERT INTO auth_sessions(id,account_id,token_digest,created_at,expires_at) VALUES(?,?,?,?,?)", id(), accountId, await hash(`session:${token}`), at, new Date(now + 7 * 86400000).toISOString()),
+        sql("INSERT INTO auth_sessions(id,account_id,token_digest,created_at,expires_at) VALUES(?,?,?,?,?)", id(), accountId, await hash(`session:${token}`), at, new Date(now + 30 * 86400000).toISOString()),
         sql("DELETE FROM auth_sessions WHERE expires_at<=?", at),
         sql("DELETE FROM login_codes WHERE expires_at<=?", now),
       ]);
-      return json({ signedIn: true }, 200, { "Set-Cookie": cookie(token) });
+      return json({ signedIn: true, registered: action === "register" }, 200, { "Set-Cookie": cookie(token) });
     }
     const user = await principal();
     if (path === "logout" && request.method === "POST") {
@@ -147,10 +157,32 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
       await sql("DELETE FROM auth_sessions WHERE token_digest=?", await hash(`session:${token}`)).run(); return json({ signedIn: false }, 200, { "Set-Cookie": cookie("", 0) });
     }
     if (path === "me" && request.method === "GET") {
-      if (loginOnly) return json({ signedIn: true, role: user.role, snapshot: null, remaining: 3, storageAvailable: false });
+      const profile = await sql("SELECT profile_ciphertext FROM accounts WHERE id=?", user.id).first<{ profile_ciphertext: string | null }>();
+      const account = profile?.profile_ciphertext ? await unseal(master, JSON.parse(profile.profile_ciphertext), `profile:${user.id}`) : { displayName: "我的账户" };
+      if (loginOnly) return json({ signedIn: true, role: user.role, account, snapshot: null, remaining: 3, storageAvailable: false });
       const archive = await loadArchive(user); const snapshot = archive ? await loadSnapshot(user, archive) : null;
       const usage = await sql("SELECT answers FROM account_usage WHERE account_id=?", user.id).first<{ answers: number }>();
-      return json({ signedIn: true, role: user.role, snapshot, remaining: 3 - (usage?.answers ?? 0), storageAvailable: true });
+      return json({ signedIn: true, role: user.role, account, snapshot, remaining: 3 - (usage?.answers ?? 0), storageAvailable: true });
+    }
+    if (path === "history" && request.method === "GET") {
+      const archive = await loadArchive(user); if (!archive) { if (new URL(request.url).searchParams.has("id")) fail(404, "这条历史记录不存在"); return json({ items: [], nextCursor: null }); }
+      const params = new URL(request.url).searchParams; const recordId = params.get("id"); const cursor = params.get("cursor");
+      const key = await keyOf(archive, user);
+      const decode = (row: RecordRow) => unseal(key, { cipher: row.payload_ciphertext, nonce: row.payload_nonce, tag: row.payload_auth_tag }, `${user.id}:${archive.id}:${row.id}`) as Promise<Snapshot>;
+      if (recordId) {
+        const row = await sql("SELECT * FROM archive_records WHERE id=? AND archive_id=? AND owner_account_id=?", string(recordId, 100), archive.id, user.id).first<RecordRow>();
+        if (!row) fail(404, "这条历史记录不存在");
+        return json({ id: row.id, at: row.created_at, snapshot: await decode(row) });
+      }
+      let before = Number.MAX_SAFE_INTEGER;
+      if (cursor) {
+        const row = await sql("SELECT rowid AS sequence FROM archive_records WHERE id=? AND archive_id=? AND owner_account_id=?", string(cursor, 100), archive.id, user.id).first<{ sequence: number }>();
+        if (!row) fail(400, "历史记录位置无效"); before = row.sequence;
+      }
+      const rows = (await sql("SELECT * FROM archive_records WHERE archive_id=? AND owner_account_id=? AND rowid<? ORDER BY rowid DESC LIMIT 21", archive.id, user.id, before).all<RecordRow>()).results;
+      const page = rows.slice(0, 20);
+      const items = await Promise.all(page.map(async row => { const snap = await decode(row); return { id: row.id, at: row.created_at, type: row.record_type, callName: snap.birth.callName, focus: snap.birth.focus, messages: snap.messages.length }; }));
+      return json({ items, nextCursor: rows.length > 20 ? page.at(-1)!.id : null });
     }
     if (path === "save" && request.method === "POST") {
       const body = await boundedBody(request); const birth = profileOf(body.birth); const chart = chartOf(birth); const report = string(body.report ?? "", 30000, false);
@@ -166,6 +198,7 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
           ]);
         }
         const prior = await loadSnapshot(user, archive);
+        if (prior && JSON.stringify(prior.birth) === JSON.stringify(birth) && prior.report === report) return json({ saved: true });
         const sameBirth = prior && ["date", "time", "place", "calendar", "gender"].every(field => prior.birth[field as keyof Birth] === birth[field as keyof Birth]);
         const snapshot = { birth, chart, report, messages: sameBirth ? prior.messages : [] };
         await (await record(user, archive, snapshot, id(), "chart", token)).run(); await audit(user, "save", archive.id);

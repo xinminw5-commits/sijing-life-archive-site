@@ -9,6 +9,7 @@ function fixture() {
   sqlite.exec(readFileSync(new URL("../drizzle/0000_sad_thunderball.sql", import.meta.url), "utf8").replaceAll("--> statement-breakpoint", ""));
   sqlite.exec(readFileSync(new URL("../drizzle/0001_login_chat.sql", import.meta.url), "utf8"));
   sqlite.exec(readFileSync(new URL("../drizzle/0002_login_limit_retention.sql", import.meta.url), "utf8"));
+  sqlite.exec(readFileSync(new URL("../drizzle/0003_account_profile.sql", import.meta.url), "utf8"));
   class Query implements Statement {
     query: string; values: SQLInputValue[] = []; constructor(query: string) { this.query = query; }
     bind(...values: (string | number | null)[]) { this.values = values; return this; }
@@ -20,7 +21,7 @@ function fixture() {
   const env: Env = { DB: db, ACCOUNT_SECRET: "synthetic-hmac-secret-not-production", ARCHIVE_KEY: btoa("x".repeat(32)), RESEND_API_KEY: "synthetic-mail-key", MAIL_FROM: "test@example.com", ACCOUNT_ENABLED: "true" };
   let time = Date.now(); const codes = new Map<string, string>();
   const deps = { now: () => time, sendMail: async (email: string, code: string) => { codes.set(email, code); }, reply: async () => "合成回答：请对照具体项目核验，不作确定性判断。" };
-  function request(path: string, body?: unknown, cookie = "", origin = "https://test.example") { return new Request(`https://test.example/api/account/${path}`, { method: body === undefined ? "GET" : "POST", headers: { Origin: origin, "Content-Type": "application/json", Cookie: cookie, "CF-Connecting-IP": "192.0.2.1" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+  function request(path: string, body?: unknown, cookie = "", origin = "https://test.example") { if (path === "verify" && body && typeof body === "object") body = { action: "register", displayName: "Synthetic account", registrationConsent: true, ...body }; return new Request(`https://test.example/api/account/${path}`, { method: body === undefined ? "GET" : "POST", headers: { Origin: origin, "Content-Type": "application/json", Cookie: cookie, "CF-Connecting-IP": "192.0.2.1" }, body: body === undefined ? undefined : JSON.stringify(body) }); }
   async function call(path: string, body?: unknown, cookie = "") { return accountRequest(request(path, body, cookie), env, deps); }
   async function login(email: string) { time += 61000; assert.equal((await call("send", { email })).status, 200); const verified = await call("verify", { email, code: codes.get(email) }); assert.equal(verified.status, 200); return verified.headers.get("set-cookie")!.split(";")[0]; }
   return { sqlite, env, deps, request, call, codes, login, advance: (ms: number) => { time += ms; } };
@@ -117,4 +118,42 @@ test("login-only deployment authenticates but blocks all archive and admin route
   assert.equal((f.sqlite.prepare("SELECT count(*) AS n FROM user_archives").get() as { n: number }).n, 0);
   assert.equal((await f.call("logout", {}, cookie)).status, 200);
   assert.equal((await f.call("me", undefined, cookie)).status, 401);
+});
+
+test("explicit registration creates encrypted account profile; login resumes the same account", async () => {
+  const f = fixture(); const cookie = await f.login("registered@example.com");
+  const first = await (await f.call("me", undefined, cookie)).json();
+  assert.equal(first.account.displayName, "Synthetic account");
+  assert.ok(!String(f.sqlite.prepare("SELECT profile_ciphertext FROM accounts").get()!.profile_ciphertext).includes("Synthetic account"));
+  await f.call("save", { birth, report: "历史报告" }, cookie);
+  await f.call("logout", {}, cookie); f.advance(61000);
+  await f.call("send", { email: "registered@example.com" });
+  const login = await f.call("verify", { email: "registered@example.com", code: f.codes.get("registered@example.com"), action: "login" });
+  assert.equal(login.status, 200); assert.match(login.headers.get("set-cookie")!, /Max-Age=2592000/);
+  const restored = await (await f.call("me", undefined, login.headers.get("set-cookie")!.split(";")[0])).json();
+  assert.equal(restored.snapshot.report, "历史报告"); assert.equal(restored.account.displayName, first.account.displayName);
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM accounts").get()!.n, 1);
+  f.advance(30 * 86400000 + 1);
+  assert.equal((await f.call("me", undefined, login.headers.get("set-cookie")!.split(";")[0])).status, 401);
+});
+test("login does not silently register and duplicate registration never overwrites an account", async () => {
+  const f = fixture(); await f.call("send", { email: "new@example.com" });
+  assert.equal((await f.call("verify", { email: "new@example.com", code: f.codes.get("new@example.com"), action: "login" })).status, 404);
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM accounts").get()!.n, 0);
+  await f.login("new@example.com"); f.advance(61000); await f.call("send", { email: "new@example.com" });
+  assert.equal((await f.call("verify", { email: "new@example.com", code: f.codes.get("new@example.com") })).status, 409);
+  assert.equal(f.sqlite.prepare("SELECT count(*) n FROM accounts").get()!.n, 1);
+});
+test("history pagination and details are scoped to the authenticated owner", async () => {
+  const f = fixture(); const a = await f.login("a@example.com"), b = await f.login("b@example.com");
+  for (let i = 0; i < 22; i++) await f.call("save", { birth, report: `历史${i}` }, a);
+  await f.call("save", { birth: { ...birth, callName: "Other" }, report: "Other private report" }, b);
+  const page = await (await f.call("history", undefined, a)).json(); assert.equal(page.items.length, 20);
+  const next = await (await f.call(`history?cursor=${page.nextCursor}`, undefined, a)).json(); assert.equal(next.items.length, 2); assert.equal(next.nextCursor, null);
+  const detail = await (await f.call(`history?id=${page.items[0].id}`, undefined, a)).json(); assert.equal(detail.snapshot.report, "历史21");
+  assert.equal((await f.call(`history?id=${page.items[0].id}`, undefined, b)).status, 404);
+  assert.equal((await f.call(`history?cursor=${page.nextCursor}`, undefined, b)).status, 400);
+  await f.call("delete", { confirm: "删除档案" }, a);
+  assert.equal((await f.call(`history?id=${page.items[0].id}`, undefined, a)).status, 404);
+  assert.equal((await (await f.call("history", undefined, a)).json()).items.length, 0);
 });

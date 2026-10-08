@@ -27,6 +27,7 @@ export const accounts = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
+    profileCiphertext: text("profile_ciphertext"),
   },
   (table) => [
     check("accounts_role_check", sql`${table.role} in ('user','admin','researcher')`),
