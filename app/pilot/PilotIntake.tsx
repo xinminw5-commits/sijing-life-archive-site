@@ -2,7 +2,8 @@
 
 import { ScrollLink } from "../ScrollLink";
 import { AccountTools } from "./AccountTools";
-import { useRef, useState } from "react";
+import type { Translation } from "../../lib/consultation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { provinces, resolveBirthPlace, type RegionSelection } from "../../lib/regions/index.ts";
 import { calculateDeterministicChart, ChartCalculationError, type DeterministicChartResult } from "../../domain/chart/index.ts";
 
@@ -15,12 +16,7 @@ const axisCopy = [
 
 const reportHeadings = ["总脉络", "结构境 观其序", "时序境 察其时", "气机境 通其气", "人生境 验其应", "事业与财务", "关系与边界", "当前阶段", "现实核验清单", "结语"] as const;
 
-const axisExplanations: Record<string, string> = {
-  "结构境 观其序": "这一部分是在说：你的命盘内部，哪些力量是主线，哪些力量在支持或牵制它。先看清这个底层顺序，才不会把某一个性格标签当成全部人生。",
-  "时序境 察其时": "这一部分是在说：同一种能力放在不同的环境和阶段里，表现会不一样。这里关注的是当下的条件、压力与机会，而不是给你贴一个永远不变的标签。",
-  "气机境 通其气": "这一部分是在说：你的精力、表达、资源和行动是怎样流动的，哪里容易卡住，怎样转换之后更容易形成实际成果。",
-  "人生境 验其应": "这一部分是在说：把前面的结构带回真实经历，用工作、关系、迁移和阶段变化去核对。能被事实验证的才保留，不能对应的就继续标为待确认。",
-};
+const axisTitles = ["结构境 观其序", "时序境 察其时", "气机境 通其气", "人生境 验其应"];
 
 const axisMeta: Record<string, { source: string; question: string; links: string }> = {
   "结构境 观其序": { source: "子平真诠", question: "这张命盘的主次与承载是什么？", links: "时序境 · 气机境" },
@@ -57,6 +53,8 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   const [analysis, setAnalysis] = useState("");
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
+  const [translations, setTranslations] = useState<Record<string, Translation>>({});
+  const renderedGeneration = generation.current;
   const [copied, setCopied] = useState(false);
   const [openExplanations, setOpenExplanations] = useState<Record<string, boolean>>({});
 
@@ -65,7 +63,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   function update(key: keyof typeof birth, value: string | boolean) {
     generation.current++; setAnalysisLoading(false);
     setBirth((current) => ({ ...current, [key]: value }));
-    setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
+    setChart(null); setError(""); setAnalysis(""); setTranslations({}); setAnalysisError(""); setOpenExplanations({});
   }
 
   function updateRegion(level: keyof RegionSelection, value: string) {
@@ -142,9 +140,10 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
   }
 
   function clear() {
+    generation.current++; setAnalysisLoading(false);
     setRegion({ province: "", city: "", district: "" }); setManualPlace(false);
     setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false });
-    setChart(null); setError(""); setAnalysis(""); setAnalysisError(""); setOpenExplanations({});
+    setChart(null); setError(""); setAnalysis(""); setTranslations({}); setAnalysisError(""); setOpenExplanations({});
   }
 
   return (
@@ -160,7 +159,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
 
       <div className="archive-form-card">
         {compact && <div className="archive-form-title"><span>免费基础档案</span><h2 id="archive-tool-title">建立你的四境档案</h2><p>先留下称呼<br />再建立属于你的四轴档案</p></div>}
-        <AccountTools birth={{ ...birth, place }} report={analysis} onRegisterName={name => setBirth(current => ({ ...current, callName: current.callName || name }))} onLogout={() => { generation.current++; setAnalysisLoading(false); setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false }); setRegion({ province: "", city: "", district: "" }); setChart(null); setAnalysis(""); setAnalysisError(""); setOpenExplanations({}); }} onRestore={saved => { generation.current++; setAnalysisLoading(false); setBirth(saved.birth); setManualPlace(true); setChart(saved.chart as DeterministicChartResult); setAnalysis(saved.report); }} />
+        <AccountTools birth={{ ...birth, place }} report={analysis} onRegisterName={name => setBirth(current => ({ ...current, callName: current.callName || name }))} onLogout={() => { generation.current++; setAnalysisLoading(false); setBirth({ callName: "", date: "", time: "", place: "", gender: "", calendar: "公历", focus: "", context: "", consent: false }); setRegion({ province: "", city: "", district: "" }); setChart(null); setAnalysis(""); setTranslations({}); setAnalysisError(""); setOpenExplanations({}); }} onRestore={saved => { generation.current++; setAnalysisLoading(false); setBirth(saved.birth); setManualPlace(true); setChart(saved.chart as DeterministicChartResult); setAnalysis(saved.report); setTranslations(saved.translations ?? {}); }} />
         <label className="archive-primary-field"><span>怎么称呼你 <small>称呼就是这份档案的识别代号</small></span><input value={birth.callName} onChange={(event) => update("callName", event.target.value)} placeholder="C07" autoComplete="nickname" /></label>
         <p className="archive-form-section-title">出生信息</p>
         <div className="archive-form-grid">
@@ -199,18 +198,18 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
           <div className="archive-deeper-heading"><div><p className="eyebrow"><span /> 深入阅读</p><h4>进一步解读</h4></div><span>{analysisLoading ? "生成中" : analysis ? "已生成" : "等待生成"}</span></div>
           {analysisLoading && <div className="archive-analysis-loading"><i />正在整理命盘结构与人生主题<br />请稍候</div>}
           {analysisError && <p className="archive-error">{analysisError}</p>}
-          {analysis && <AnalysisDisplay report={analysis} openExplanations={openExplanations} setOpenExplanations={setOpenExplanations} />}
+          {analysis && <AnalysisDisplay report={analysis} translations={translations} onTranslation={(title, value) => { if (generation.current === renderedGeneration) setTranslations(current => ({ ...current, [title]: value })); }} openExplanations={openExplanations} setOpenExplanations={setOpenExplanations} />}
         </section>
       </div>}
     </section>
   );
 }
 
-function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { report: string; openExplanations: Record<string, boolean>; setOpenExplanations: (value: Record<string, boolean>) => void }) {
+function AnalysisDisplay({ report, translations, onTranslation, openExplanations, setOpenExplanations }: { report: string; translations: Record<string, Translation>; onTranslation: (title: string, value: Translation) => void; openExplanations: Record<string, boolean>; setOpenExplanations: (value: Record<string, boolean>) => void }) {
   const blocks = parseReport(report);
   const summary = blocks.find((block) => block.title === "总脉络");
-  const axes = blocks.filter((block) => axisExplanations[block.title]);
-  const supporting = blocks.filter((block) => block !== summary && !axisExplanations[block.title]);
+  const axes = blocks.filter((block) => axisTitles.includes(block.title));
+  const supporting = blocks.filter((block) => block !== summary && !axisTitles.includes(block.title));
   const [activeAxis, setActiveAxis] = useState(0);
   const activeBlock = axes[activeAxis] ?? axes[0];
 
@@ -221,7 +220,7 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
   return <div className="archive-analysis-layout">
     {summary && <article className="analysis-summary"><div className="analysis-kicker">先看这一条主线</div><h5>{summary.title}</h5><p>{summary.body}</p></article>}
     {axes.length > 0 && <>
-      <div className="analysis-axis-intro"><span>四境阅览台</span><p>点击左侧印记切换阅读视角。先看正式分析，再打开白话译注；四个方向共同组成一份人生档案。</p></div>
+      <div className="analysis-axis-intro"><span>四境阅览台</span><p>点击左侧印记切换阅读视角。白话译注会把当前这段分析翻译成更容易理解的表达。</p></div>
       <div className="analysis-lens-shell">
         <aside className="analysis-lens-index"><div className="analysis-panel-label">四境分工</div><p>一份档案，四种观看方式</p>
           <nav className="analysis-lens-rail" aria-label="四境分析视角">
@@ -229,7 +228,7 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
             <span className="analysis-lens-tab-index">0{index + 1}</span><span className="analysis-lens-tab-name">{block.title.split(" ")[0]}</span><small>{block.title.split(" ").slice(1).join(" ")}</small><i />
           </button>)}
           </nav>
-          <div className="analysis-index-note">点击一境，中央档案会切换；右侧译注同步更新。</div>
+          <div className="analysis-index-note">点击一境，切换对应分析与白话译注。</div>
         </aside>
         {activeBlock && <article className={`analysis-lens-stage axis-${activeAxis + 1}`} key={activeBlock.title} role="tabpanel">
           <div className="analysis-lens-stage-top"><span>当前视角 · {String(activeAxis + 1).padStart(2, "0")}</span><em>{activeBlock.title.split(" ").slice(1).join(" ")}</em></div>
@@ -240,11 +239,31 @@ function AnalysisDisplay({ report, openExplanations, setOpenExplanations }: { re
           <button className={`analysis-explain-button${openExplanations[activeBlock.title] ? " is-open" : ""}`} type="button" aria-expanded={Boolean(openExplanations[activeBlock.title])} onClick={() => toggle(activeBlock.title)}>
             <span><b>{openExplanations[activeBlock.title] ? "收起译注" : "打开白话译注"}</b><small>{openExplanations[activeBlock.title] ? "回到正式分析" : "把这一轴翻译成日常语言"}</small></span><strong>{openExplanations[activeBlock.title] ? "↑" : "↓"}</strong>
           </button>
-          {openExplanations[activeBlock.title] && <div className="analysis-explanation"><span>白话译注</span>{axisExplanations[activeBlock.title]}</div>}
+          {openExplanations[activeBlock.title] && <PlainTranslation key={activeBlock.title + activeBlock.body} block={activeBlock} translation={translations[activeBlock.title]} onTranslation={onTranslation} />}
         </article>}
-        {activeBlock && <aside className="analysis-lens-context"><div className="analysis-panel-label">当前轴档案</div><div className="analysis-context-seal">{activeBlock.title.slice(0, 1)}</div><h5>{activeBlock.title}</h5><span className="analysis-context-source">依据 · {axisMeta[activeBlock.title]?.source}</span><div className="analysis-context-rule" /><small>它主要回答</small><p>{axisMeta[activeBlock.title]?.question}</p><div className="analysis-context-translate"><span>白话译注</span><p>{axisExplanations[activeBlock.title]}</p></div><small>关联阅读</small><b className="analysis-context-links">{axisMeta[activeBlock.title]?.links}</b></aside>}
+        {activeBlock && <aside className="analysis-lens-context"><div className="analysis-panel-label">当前轴档案</div><div className="analysis-context-seal">{activeBlock.title.slice(0, 1)}</div><h5>{activeBlock.title}</h5><span className="analysis-context-source">依据 · {axisMeta[activeBlock.title]?.source}</span><div className="analysis-context-rule" /><small>它主要回答</small><p>{axisMeta[activeBlock.title]?.question}</p><small>关联阅读</small><b className="analysis-context-links">{axisMeta[activeBlock.title]?.links}</b></aside>}
       </div>
     </>}
     {supporting.length > 0 && <div className="analysis-supporting"><div className="analysis-supporting-heading"><span>落回现实</span><p>这些部分把四轴分析放回工作、关系、阶段和具体核验。</p></div><div className="analysis-supporting-grid">{supporting.map((block) => <article key={block.title}><h5>{block.title}</h5><p>{block.body}</p></article>)}</div></div>}
+  </div>;
+}
+
+function PlainTranslation({ block, translation, onTranslation }: { block: ReportBlock; translation?: Translation; onTranslation: (title: string, value: Translation) => void }) {
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const active = translation?.source === block.body ? translation : undefined;
+  const attempted = useRef(false);
+  const translate = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const options = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: block.body, title: block.title }) };
+      let response = await fetch("/api/account/translate", options);
+      if (response.status === 401 || response.status === 503) response = await fetch("/api/translate", options);
+      const value = await response.json(); if (!response.ok || !value.translation) throw new Error(value.error || "译注暂未生成");
+      onTranslation(block.title, value.translation);
+    } catch (e) { setError(e instanceof Error ? e.message : "译注暂未生成，请重试"); } finally { setBusy(false); }
+  }, [block.body, block.title, onTranslation]);
+  useEffect(() => { if (!active && !attempted.current) { attempted.current = true; void translate(); } }, [active, translate]);
+  return <div className="analysis-explanation"><span>白话译注</span>
+    {active ? <><p>{active.plainLanguage}</p><div className="translation-example"><b>帮助理解的类比</b><small>仅解释上文，不是本人经历或预测。</small><p>{active.example}</p></div></> : <><button type="button" disabled={busy} onClick={() => void translate()}>{busy ? "正在翻译上面这段分析…" : "翻译这段分析"}</button><small>仅把上文换成更好理解的表达，不占用追问次数。</small>{error && <p role="alert">{error}</p>}</>}
   </div>;
 }

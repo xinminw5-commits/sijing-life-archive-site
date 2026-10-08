@@ -1,3 +1,4 @@
+import type { ConsultationContext } from "../server/consultation-context.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
@@ -156,4 +157,84 @@ test("history pagination and details are scoped to the authenticated owner", asy
   await f.call("delete", { confirm: "删除档案" }, a);
   assert.equal((await f.call(`history?id=${page.items[0].id}`, undefined, a)).status, 404);
   assert.equal((await (await f.call("history", undefined, a)).json()).items.length, 0);
+});
+
+test("three saved replies survive overnight, report revisions and a new chart; filtered history still opens them", async () => {
+  const f = fixture(); const cookie = await f.login("overnight@example.com");
+  await f.call("save", { birth, report: "原报告" }, cookie);
+  for (let n=1; n<=3; n++) {
+    const response = await f.call("chat", { question: `追问${n}`, requestId: crypto.randomUUID() }, cookie);
+    const value = await response.json(); assert.equal(value.saved, true); assert.equal(value.message.question, `追问${n}`);
+  }
+  f.advance(12 * 3600_000);
+  await f.call("save", { birth: { ...birth, date: "1993-06-15" }, report: "新盘报告" }, cookie);
+  const me = await (await f.call("me", undefined, cookie)).json(); assert.equal(me.snapshot.messages.length, 0); assert.ok(me.latestDiscussion);
+  const discussions = await (await f.call("history?kind=consultation", undefined, cookie)).json();
+  assert.equal(discussions.items.length, 3); assert.equal(discussions.items[0].lastQuestion, "追问3");
+  const detail = await (await f.call(`history?id=${me.latestDiscussion.id}`, undefined, cookie)).json();
+  assert.deepEqual(detail.snapshot.messages.map((m: { question: string }) => m.question), ["追问1", "追问2", "追问3"]);
+  assert.equal(detail.snapshot.report, "原报告");
+  const reports = await (await f.call("history?kind=chart", undefined, cookie)).json(); assert.equal(reports.items.length, 2);
+  assert.equal((await f.call("history?kind=invalid", undefined, cookie)).status, 400);
+});
+
+test("reply receives server-calculated chart, actual rule bodies, user context, conversation and current time", async () => {
+  const f = fixture(); const cookie = await f.login("knowledge@example.com"); await f.call("save", { birth, report: "不是事实的旧初稿" }, cookie);
+  const captured: { value?: ConsultationContext } = {};
+  const response = await accountRequest(f.request("chat", { question: "事业上为什么投入没有成果", requestId: crypto.randomUUID() }, cookie), f.env, { ...f.deps, reply: async c => { captured.value = c as ConsultationContext; return "合成回答"; } });
+  assert.equal(response.status, 200); const context = captured.value!; assert.deepEqual(context.personal.birth, birth);
+  assert.equal(context.personal.chart.selectedVariant!.pillars.length, 4);
+  assert.ok(context.knowledge.rules.find((r) => r.id === "ZP007")!["使用条件"].includes("日主"));
+  assert.ok(context.knowledge.rules.find((r) => r.id === "DT002")!["失效条件"]);
+  assert.ok(context.knowledge.rules.every((r) => r.realityValidation === "unvalidated"));
+  assert.ok(context.evidenceBoundary.includes("初稿和旧回答不是用户事实")); assert.ok(context.asOf);
+});
+
+test("translation is bound to the saved source, cached encrypted and never spends a question", async () => {
+  const f = fixture(); const a = await f.login("translation@example.com"), b = await f.login("other@example.com");
+  const source = "月令财为主，食神作为来源；但是否有承载和连续路径仍需核验，不能从一颗财星推断经营收益。";
+  await f.call("save", { birth, report: `结构境 观其序\n${source}` }, a);
+  let calls = 0; const deps = { ...f.deps, translate: async () => { calls++; return { source, plainLanguage: "合成译文", example: "合成类比" }; } };
+  const req = () => accountRequest(f.request("translate", { title: "结构境 观其序", source }, a), f.env, deps);
+  assert.equal((await req()).status, 200); assert.equal((await req()).status, 200); assert.equal(calls, 1);
+  const me = await (await f.call("me", undefined, a)).json(); assert.equal(me.remaining, 3); assert.equal(me.snapshot.translations["结构境 观其序"].source, source);
+  assert.equal((await accountRequest(f.request("translate", { title: "结构境 观其序", source }, b), f.env, deps)).status, 409);
+  assert.equal((await accountRequest(f.request("translate", { title: "结构境 观其序", source: "不存在的原文" }, a), f.env, deps)).status, 409);
+  const encrypted = JSON.stringify(f.sqlite.prepare("SELECT payload_ciphertext FROM archive_records").all()); assert.ok(!encrypted.includes("合成译文"));
+});
+
+test("a generic model response without structured personal evidence does not spend quota or store a reply", async () => {
+  const f = fixture(); const cookie = await f.login("quality@example.com"); await f.call("save", { birth }, cookie);
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({ output_text: "保持积极，注意沟通，你有很大潜力。" });
+    const response = await accountRequest(f.request("chat", { question: "具体怎么做？", requestId: crypto.randomUUID() }, cookie), { ...f.env, DEEPSEEK_API_KEY: "synthetic" }, { now: f.deps.now });
+    assert.equal(response.status, 502); assert.equal((await (await f.call("me", undefined, cookie)).json()).remaining, 3);
+    assert.equal(f.sqlite.prepare("SELECT count(*) n FROM chat_receipts").get()!.n, 0);
+  } finally { globalThis.fetch = original; }
+});
+
+test("structured reply is persisted with plain language, sources and saved receipt, and replay returns the same answer", async () => {
+  const f = fixture(); const cookie = await f.login("structured@example.com"); await f.call("save", { birth, report: "合成报告" }, cookie);
+  const original = globalThis.fetch; let modelCalls = 0;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      modelCalls++; const sent = JSON.parse(String(options?.body)); const context = JSON.parse(sent.input) as ConsultationContext;
+      const anchors = context.allowedChartAnchors.slice(0,2);
+      return Response.json({ output_text: JSON.stringify({
+        directAnswer: "按你提供的项目经历，先核对投入有没有转成明确的成果与交付，再判断是能力不足还是承接条件不足。现在还不能由盘面直接决定是否换工作。",
+        reasoning: `你的${anchors.join("与")}是排盘事实，月令主气提供了财这一候选切入点。ZP001要求先看月令再查配合，DT002要求检查来源、过程和落点。若只见投入却没有产出被采用的事实，就不能宣布这条路径已经成立。尚不清楚项目产出是否被客户或团队实际接受。`,
+        plainLanguage: "换成日常说法：你投入了很多时间，不等于这些时间已经变成别人愿意采用的成果。先看作品有没有完成、交付有没有被采用，再看岗位是否提供了承接条件。这是当前需要核对的两种可能，并不是在说你没有能力，也不是承诺换环境就一定成功。",
+        example: { scenario: "一个合成情境是：某人做出了产品样稿，但一直没有约定谁来验收。他误以为自己的技术不好，实际问题可能是交付和采用的环节没接上。这个例子只说明投入、产出和承接是不同环节。", limit: "没有你真实的交付记录，不能把这个情境直接当成你的经历或结论。" },
+        nextSteps: ["列出最近一个项目已完成的交付物与实际验收结果。"], verification: "最近一次产出是没有完成，还是已经完成却没有被采用？",
+        chartAnchors: anchors, ruleIds: ["ZP001", "DT002"],
+      }) });
+    };
+    const requestId = crypto.randomUUID(); const body = { question: "投入为何没有成果？", requestId };
+    const call = () => accountRequest(f.request("chat", body, cookie), { ...f.env, DEEPSEEK_API_KEY: "synthetic" }, { now: f.deps.now });
+    const first = await (await call()).json(); assert.equal(first.saved, true); assert.equal(first.remaining, 2); assert.ok(first.message.reading.plainLanguage.includes("投入"));
+    const replay = await (await call()).json(); assert.equal(replay.replayed, true); assert.deepEqual(replay.message, first.message); assert.equal(modelCalls, 1);
+    const me = await (await f.call("me", undefined, cookie)).json(); assert.equal(me.snapshot.messages.length, 1); assert.equal(me.snapshot.messages[0].reading.sources[1].id, "DT002");
+    assert.ok(!JSON.stringify(f.sqlite.prepare("SELECT payload_ciphertext FROM archive_records").all()).includes("投入为何"));
+  } finally { globalThis.fetch = original; }
 });

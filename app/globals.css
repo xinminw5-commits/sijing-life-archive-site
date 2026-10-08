@@ -1456,4 +1456,29 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--vermillion); ou
 .account-history > p { color: var(--ink-soft); font-size: 13px; }
 .account-history-item { width: 100%; display: grid; gap: 8px; text-align: left; padding: 16px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--teal); cursor: pointer; }
 .account-history-item small { color: var(--ink-soft); }
+.conversation-reading { padding: 20px; background: #fffcf5; border-left: 2px solid var(--gold); }
+.conversation-reading section + section { margin-top: 24px; }
+.conversation-reading h4 { font-size: 17px; color: var(--teal); margin: 0 0 10px; }
+.conversation-reading p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.85; }
+.conversation-plain { background: #f1ece2; padding: 18px; }
+.conversation-example { border-top: 1px solid var(--line); padding-top: 18px; }
+.conversation-reading small, .conversation-saved { color: var(--ink-soft); font-size: 12px; }
+.conversation-saved { display: block; margin: 10px 0 24px; }
+.conversation-reading details { margin-top: 20px; font-size: 12px; }
+.account-last-discussion { color: var(--teal); margin-top: 16px; }
+.account-last-discussion button { margin-left: 12px; }
+.analysis-explanation p { margin-top: 16px; white-space: pre-wrap; }
+.analysis-explanation small { display: block; font-family: var(--font-sans); font-size: 13px; color: var(--ink-soft); margin-top: 10px; }
+.analysis-explanation button { border: 1px solid var(--vermillion); background: transparent; color: var(--vermillion); padding: 12px 18px; margin: 18px 0 8px; cursor: pointer; }
+.translation-example { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 16px; }
 .account-saved-report { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.9; }
+
+@media (max-width: 680px) {
+  .analysis-lens-shell { grid-template-columns: 1fr; }
+  .analysis-lens-index { padding: 18px 10px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .analysis-lens-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .analysis-lens-tab { min-height: 100px; padding: 12px 8px; }
+  .analysis-lens-stage { padding: 24px 20px; }
+  .conversation-reading { padding: 16px; }
+  .conversation-plain { padding: 14px; }
+}
