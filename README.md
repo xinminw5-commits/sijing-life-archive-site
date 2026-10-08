@@ -6,7 +6,7 @@
 
 **尚未开放：**暂无发信域名与Resend账号/API配置，也未指定并验证管理员邮箱。`ACCOUNT_ENABLED=false`，即使页面出现登录入口，服务端仍503且不收取真实资料留档。密钥文件 `.env.account-secrets.json` 被忽略、权限0600，不得打印、提交或反复生成覆盖；轮换会影响已有身份摘要/档案解密，需独立方案。不得在README或聊天中粘贴密钥。
 
-部署命令：`pnpm exec wrangler pages deploy docs --project-name sijing-life-archive --branch main --config wrangler.jsonc`；迁移：`pnpm exec wrangler d1 migrations apply sijing-accounts --remote --config wrangler.jsonc`。发信账号/自有域名经验证后，将 `RESEND_API_KEY`、`MAIL_FROM` 配入生产，真实收信验收，再将wrangler中的开关改true部署。管理员只在本人完成邮箱验证后通过受控数据库赋权，前端无角色切换。Resend注册/域名购买或DNS账户权限尚不可代替用户完成，不得假报发信成功。
+部署命令：`pnpm exec wrangler pages deploy docs --project-name sijing-life-archive --branch main`；迁移：`pnpm exec wrangler d1 migrations apply sijing-accounts --remote --config wrangler.jsonc`。发信账号/自有域名经验证后，将 `RESEND_API_KEY`、`MAIL_FROM` 配入生产，真实收信验收，再将wrangler中的开关改true部署。管理员只在本人完成邮箱验证后通过受控数据库赋权，前端无角色切换。Resend注册/域名购买或DNS账户权限尚不可代替用户完成，不得假报发信成功。
 
 服务处理授权包括均均人工复核，不包含研究或公开；研究/公开角色与副本未开放。删除接口只确认在线数据删除，历史备份按Cloudflare窗口到期，`deletion_jobs.completed`仅指在线删除，不代表所有备份已清。跨研究/公开三域、账户完整注销、长期保留通知/到期任务、备份恢复后的删除重放及外部KMS/轮换仍需补齐，当前开关不得提前开放给真实用户。新适配器不能借用旧领域测试声称这些生产流程完成。
 

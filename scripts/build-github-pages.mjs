@@ -46,4 +46,7 @@ await writeFile(join(pages, "admin", "index.html"), rewrite(await render("/admin
 await writeFile(join(pages, "preview", "index.html"), '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/"><title>四境人生档案</title><a href="/">返回档案</a></html>');
 await writeFile(join(pages, "_redirects"), "/preview / 302\n/preview/ / 302\n");
 
+// Pages deploy must use the root configuration and D1 binding, not Vite's generated Worker redirect.
+await rm(join(project, ".wrangler", "deploy", "config.json"), { force: true });
+
 console.log(`Cloudflare Pages output written to ${relative(project, pages)}`);
