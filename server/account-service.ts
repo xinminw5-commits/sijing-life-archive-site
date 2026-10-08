@@ -65,8 +65,9 @@ function chartOf(birth: Birth) {
 export async function accountRequest(request: Request, env: Env, deps: Dependencies = {}): Promise<Response> {
   const now = deps.now?.() ?? Date.now(); const at = new Date(now).toISOString();
   const path = new URL(request.url).pathname.replace(/^\/api\/account\/?/, "").replace(/\/$/, "");
-  const ready = !!(env.DB && env.ACCOUNT_SECRET && env.ARCHIVE_KEY && env.RESEND_API_KEY && env.MAIL_FROM && env.ACCOUNT_ENABLED === "true");
-  if (path === "status" && request.method === "GET") return json({ available: ready });
+  const loginOnly = env.ACCOUNT_ENABLED === "login-only";
+  const ready = !!(env.DB && env.ACCOUNT_SECRET && env.ARCHIVE_KEY && env.RESEND_API_KEY && env.MAIL_FROM && (env.ACCOUNT_ENABLED === "true" || loginOnly));
+  if (path === "status" && request.method === "GET") return json({ available: ready, storageAvailable: ready && !loginOnly });
   if (!ready) return json({ error: "邮箱登录尚未开放，当前仍可生成本次档案。" }, 503);
   const db = env.DB!; const secret = env.ACCOUNT_SECRET!; const master = bytes(env.ARCHIVE_KEY!);
   const sql = (query: string, ...values: (string | number | null)[]) => db.prepare(query).bind(...values);
@@ -99,6 +100,7 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
   }
   try {
     if (request.method !== "GET" && request.headers.get("Origin") !== new URL(request.url).origin) fail(403, "请从本站页面提交请求");
+    if (loginOnly && !["send", "verify", "me", "logout"].includes(path)) fail(503, "邮箱已接通，档案保存和讨论正在准备。当前不会保存出生资料。");
     if (path === "send" && request.method === "POST") {
       const body = await boundedBody(request); const email = emailOf(body.email); const emailDigest = await hash(`email:${email}`);
       const ip = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -145,9 +147,10 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
       await sql("DELETE FROM auth_sessions WHERE token_digest=?", await hash(`session:${token}`)).run(); return json({ signedIn: false }, 200, { "Set-Cookie": cookie("", 0) });
     }
     if (path === "me" && request.method === "GET") {
+      if (loginOnly) return json({ signedIn: true, role: user.role, snapshot: null, remaining: 3, storageAvailable: false });
       const archive = await loadArchive(user); const snapshot = archive ? await loadSnapshot(user, archive) : null;
       const usage = await sql("SELECT answers FROM account_usage WHERE account_id=?", user.id).first<{ answers: number }>();
-      return json({ signedIn: true, role: user.role, snapshot, remaining: 3 - (usage?.answers ?? 0) });
+      return json({ signedIn: true, role: user.role, snapshot, remaining: 3 - (usage?.answers ?? 0), storageAvailable: true });
     }
     if (path === "save" && request.method === "POST") {
       const body = await boundedBody(request); const birth = profileOf(body.birth); const chart = chartOf(birth); const report = string(body.report ?? "", 30000, false);

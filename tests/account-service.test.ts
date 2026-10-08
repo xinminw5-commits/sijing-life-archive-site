@@ -103,3 +103,18 @@ test("logout invalidates server session, export and delete only affect owner", a
   assert.equal(f.sqlite.prepare("SELECT count(*) n FROM archive_records").get()!.n,1);
   await f.call("logout",{},a);assert.equal((await f.call("me",undefined,a)).status,401);
 });
+
+test("login-only deployment authenticates but blocks all archive and admin routes", async () => {
+  const f = fixture(); f.env.ACCOUNT_ENABLED = "login-only";
+  const status = await (await f.call("status")).json();
+  assert.deepEqual(status, { available: true, storageAvailable: false });
+  const cookie = await f.login("synthetic@example.com");
+  const me = await (await f.call("me", undefined, cookie)).json();
+  assert.equal(me.signedIn, true); assert.equal(me.snapshot, null); assert.equal(me.storageAvailable, false);
+  for (const path of ["save", "chat", "delete", "admin", "export"]) {
+    assert.equal((await f.call(path, path === "export" ? undefined : { birth }, cookie)).status, 503);
+  }
+  assert.equal((f.sqlite.prepare("SELECT count(*) AS n FROM user_archives").get() as { n: number }).n, 0);
+  assert.equal((await f.call("logout", {}, cookie)).status, 200);
+  assert.equal((await f.call("me", undefined, cookie)).status, 401);
+});

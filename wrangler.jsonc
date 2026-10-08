@@ -4,5 +4,5 @@
   "compatibility_date": "2026-10-08",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [{ "binding": "DB", "database_name": "sijing-accounts", "database_id": "7a4740f2-84b0-4f31-8d65-1db2ebbce788", "migrations_dir": "drizzle" }],
-  "vars": { "ACCOUNT_ENABLED": "false" }
+  "vars": { "ACCOUNT_ENABLED": "login-only" }
 }
