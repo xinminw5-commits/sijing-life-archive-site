@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountTools } from "./AccountTools";
 import { useState } from "react";
 import { provinces, resolveBirthPlace, type RegionSelection } from "../../lib/regions/index.ts";
 import { calculateDeterministicChart, ChartCalculationError, type DeterministicChartResult } from "../../domain/chart/index.ts";
@@ -156,6 +157,7 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
 
       <div className="archive-form-card">
         {compact && <div className="archive-form-title"><span>免费基础档案</span><h2 id="archive-tool-title">建立你的四境档案</h2><p>先留下称呼<br />再建立属于你的四轴档案</p></div>}
+        <AccountTools birth={{ ...birth, place }} report={analysis} onRestore={saved => { setBirth(saved.birth); setManualPlace(true); setChart(saved.chart as DeterministicChartResult); setAnalysis(saved.report); }} />
         <label className="archive-primary-field"><span>怎么称呼你 <small>称呼就是这份档案的识别代号</small></span><input value={birth.callName} onChange={(event) => update("callName", event.target.value)} placeholder="C07" autoComplete="nickname" /></label>
         <p className="archive-form-section-title">出生信息</p>
         <div className="archive-form-grid">
@@ -175,9 +177,9 @@ export function PilotIntake({ compact = false }: { compact?: boolean }) {
             <small className="archive-place-note">当前按北京时间排盘；其他时区的出生资料暂不支持。</small>
           </fieldset>
           <label className="archive-form-span"><span>想先了解的主题 <small>可选</small></span><input value={birth.focus} onChange={(event) => update("focus", event.target.value)} placeholder="例如 事业 关系 迁移或当前阶段" /></label>
-          <label className="archive-form-span"><span>现实处境与经历 <small>越具体 越能避免泛泛而谈</small></span><textarea rows={5} value={birth.context} onChange={(event) => update("context", event.target.value)} placeholder="可以写最近几年重要的工作、关系、迁移、财务或情绪经历，以及你现在最想核对的问题。本站只在本次请求中使用，不作长期留存。" /></label>
+          <label className="archive-form-span"><span>现实处境与经历 <small>越具体 越能避免泛泛而谈</small></span><textarea rows={5} value={birth.context} onChange={(event) => update("context", event.target.value)} placeholder="可以写最近几年重要的工作、关系、迁移、财务或情绪经历，以及你现在最想核对的问题。登录并主动保存后，下次可以继续。" /></label>
         </div>
-        <label className="archive-consent"><input type="checkbox" checked={birth.consent} onChange={(event) => update("consent", event.target.checked)} /><span>我同意使用本次出生信息生成档案<br />本站不作长期留存</span></label>
+        <label className="archive-consent"><input type="checkbox" checked={birth.consent} onChange={(event) => update("consent", event.target.checked)} /><span>我同意使用本次出生信息生成档案<br />登录后可主动保存；保存仅用于个人档案及均均服务复核，不用于研究或公开展示</span></label>
         <div className="archive-generate-row"><button className="button button-primary" type="button" onClick={generate} disabled={!ready}>生成我的基础档案</button>{!ready && <small>请留下称呼并补全出生信息与授权</small>}</div>
         {error && <p className="archive-error" role="alert">{error}</p>}
       </div>

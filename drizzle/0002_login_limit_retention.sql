@@ -1,0 +1,1 @@
+ALTER TABLE login_limits ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0;

@@ -4,6 +4,8 @@ import {
   check,
   foreignKey,
   index,
+  integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -125,6 +127,7 @@ export const userArchives = sqliteTable(
   },
   (table) => [
     uniqueIndex("user_archives_owner_id_uq").on(table.ownerAccountId, table.id),
+    uniqueIndex("one_service_archive").on(table.ownerAccountId),
     index("user_archives_owner_idx").on(table.ownerAccountId),
     index("user_archives_retention_idx").on(table.retentionDeleteAt),
     check(
@@ -417,3 +420,22 @@ export type DatabaseSchema = {
   deletionJobs: typeof deletionJobs;
   auditEvents: typeof auditEvents;
 };
+
+// Email authentication and service quota adapter (service.v1).
+export const loginCodes = sqliteTable("login_codes", {
+  emailDigest: text("email_digest").primaryKey(), codeDigest: text("code_digest").notNull(),
+  expiresAt: integer("expires_at").notNull(), attempts: integer("attempts").notNull().default(0),
+  used: integer("used").notNull().default(0), ready: integer("ready").notNull().default(0), challenge: text("challenge").notNull(),
+});
+export const loginLimits = sqliteTable("login_limits", {
+  bucket: text("bucket").primaryKey(), hits: integer("hits").notNull(), expiresAt: integer("expires_at").notNull().default(0),
+});
+export const accountUsage = sqliteTable("account_usage", {
+  accountId: text("account_id").primaryKey().references(() => accounts.id, { onDelete: "cascade" }),
+  answers: integer("answers").notNull().default(0), lockToken: text("lock_token"), lockUntil: integer("lock_until").notNull().default(0),
+}, table => [check("account_usage_answers_check", sql`${table.answers} BETWEEN 0 AND 3`)]);
+export const chatReceipts = sqliteTable("chat_receipts", {
+  accountId: text("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  requestId: text("request_id").notNull(), questionDigest: text("question_digest").notNull(),
+  recordId: text("record_id").notNull().references(() => archiveRecords.id, { onDelete: "cascade" }),
+}, table => [primaryKey({ columns: [table.accountId, table.requestId] })]);

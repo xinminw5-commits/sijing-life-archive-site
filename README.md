@@ -1,3 +1,19 @@
+## 2026-10-08 真实账号接入（当前节点）
+
+用户撤销独立预览说明页面；原 `/preview/` 跳回首页。首页保留纵向三屏，账户动作融入建档表单，讨论使用原页面弹窗；不展示“用户视角”、虚构账号或预设回复。
+
+本轮部署四境专用 D1 `sijing-accounts`、17表及3次迁移，生产绑定 `DB`，上传专用 `ACCOUNT_SECRET` 与 `ARCHIVE_KEY`。`server/account-service.ts` 接邮箱OTP（Resend）、受信Cookie会话、资料/报告/讨论的AEAD信封加密、所有者查询、追加版本、导出及在线删除、管理员角色与原因/工单留痕。对话调用已有DeepSeek接口，服务器限定每账号3次成功回答，失败/缺档案不计费，重试幂等，账户锁控制并发；初始报告独立于追问额度。正式规则库未装配，AI初稿不是已验证结论。
+
+**尚未开放：**暂无发信域名与Resend账号/API配置，也未指定并验证管理员邮箱。`ACCOUNT_ENABLED=false`，即使页面出现登录入口，服务端仍503且不收取真实资料留档。密钥文件 `.env.account-secrets.json` 被忽略、权限0600，不得打印、提交或反复生成覆盖；轮换会影响已有身份摘要/档案解密，需独立方案。不得在README或聊天中粘贴密钥。
+
+部署命令：`pnpm exec wrangler pages deploy docs --project-name sijing-life-archive --branch main --config wrangler.jsonc`；迁移：`pnpm exec wrangler d1 migrations apply sijing-accounts --remote --config wrangler.jsonc`。发信账号/自有域名经验证后，将 `RESEND_API_KEY`、`MAIL_FROM` 配入生产，真实收信验收，再将wrangler中的开关改true部署。管理员只在本人完成邮箱验证后通过受控数据库赋权，前端无角色切换。Resend注册/域名购买或DNS账户权限尚不可代替用户完成，不得假报发信成功。
+
+服务处理授权包括均均人工复核，不包含研究或公开；研究/公开角色与副本未开放。删除接口只确认在线数据删除，历史备份按Cloudflare窗口到期，`deletion_jobs.completed`仅指在线删除，不代表所有备份已清。跨研究/公开三域、账户完整注销、长期保留通知/到期任务、备份恢复后的删除重放及外部KMS/轮换仍需补齐，当前开关不得提前开放给真实用户。新适配器不能借用旧领域测试声称这些生产流程完成。
+
+Render目前是docs静态镜像，无法运行Pages Functions或直接使用D1；镜像中的登录入口跳主站，必须在同一个主站域内使用Cookie。原报告接口在Render也不可用；实际服务主站是Cloudflare。若要Render地址提供全部能力，需要将Render改为后端Web Service/受控代理，或绑定自有域名到主站，尚未取得Render管理入口。
+
+验证：72项领域测试（含12项账号服务SQLite适配器测试）+4项渲染测试、增量严格类型、lint、Pages构建与Functions编译通过。发送服务/AI外部请求在测试中注入合成替身，不能据此宣称真实验证码已送达。
+
 ## 2026-10-08 账号与互动预览
 
 用户暂无发信域名/服务，先做可预览和测试版本。入口 `/preview/`。两个虚构账号各自维护当前页面内的资料、对话和3次有效回答额度；退出再进入保留，刷新重置。第三次回答后展示小结和未开放的专题/人工复核入口。后台演示档案、反证、查看用途留痕；导出仅含示例资料。
