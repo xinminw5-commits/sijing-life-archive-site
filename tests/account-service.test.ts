@@ -28,6 +28,40 @@ function fixture() {
   return { sqlite, env, deps, request, call, codes, login, advance: (ms: number) => { time += ms; } };
 }
 const birth = { callName: "Synthetic", date: "1992-06-15", time: "09:30", place: "杭州", gender: "女", calendar: "公历", focus: "事业", context: "合成项目经历", consent: true };
+test("account centre identity is stable across login, summaries only count the owner's persisted records", async () => {
+  const f = fixture(); const a = await f.login("centre-a@example.com"), b = await f.login("centre-b@example.com");
+  const empty = await (await f.call("me", undefined, a)).json();
+  assert.match(empty.account.number, /^SJ-[A-F0-9]{16}$/);
+  assert.equal(empty.account.loginMethod, "email_code"); assert.ok(empty.account.createdAt);
+  assert.deepEqual(empty.summary, { savedVersions: 0, savedQuestions: 0, lastSavedAt: null });
+  const other = await (await f.call("me", undefined, b)).json(); assert.notEqual(empty.account.number, other.account.number);
+  await f.call("save", { birth, report: "合成报告" }, a);
+  const questionId = crypto.randomUUID(); await f.call("chat", { question: "合成提问", requestId: questionId }, a); await f.call("chat", { question: "合成提问", requestId: questionId }, a);
+  const current = await (await f.call("me", undefined, a)).json();
+  assert.equal(current.summary.savedQuestions, 1); assert.equal(current.summary.savedVersions, 2); assert.ok(current.summary.lastSavedAt);
+  assert.equal((await (await f.call("me", undefined, b)).json()).summary.savedVersions, 0);
+  await f.call("logout", {}, a); f.advance(61000); await f.call("send", { email: "centre-a@example.com" });
+  const login = await f.call("verify", { email: "centre-a@example.com", code: f.codes.get("centre-a@example.com"), action: "login" });
+  const restored = await (await f.call("me", undefined, login.headers.get("set-cookie")!.split(";")[0])).json();
+  assert.equal(restored.account.number, empty.account.number); assert.equal(restored.account.createdAt, empty.account.createdAt);
+  await f.call("delete", { confirm: "删除档案" }, login.headers.get("set-cookie")!.split(";")[0]);
+  const cleared = await (await f.call("me", undefined, login.headers.get("set-cookie")!.split(";")[0])).json();
+  assert.equal(cleared.account.number, empty.account.number); assert.equal(cleared.summary.savedQuestions, 0); assert.equal(cleared.remaining, 2);
+});
+test("profile settings update only the authenticated owner's encrypted name, keep archive and quota unchanged", async () => {
+  const f = fixture(); const a = await f.login("settings-a@example.com"), b = await f.login("settings-b@example.com");
+  await f.call("save", { birth, report: "合成历史" }, a);
+  const initial = await (await f.call("me", undefined, a)).json();
+  const changed = await (await f.call("profile", { displayName: "新的合成称呼", accountId: "someone-else", role: "admin" }, a)).json();
+  assert.equal(changed.saved, true); assert.equal(changed.account.displayName, "新的合成称呼"); assert.equal(changed.account.number, initial.account.number);
+  const restored = await (await f.call("me", undefined, a)).json(); assert.equal(restored.account.displayName, "新的合成称呼"); assert.deepEqual(restored.snapshot, initial.snapshot); assert.equal(restored.remaining, 3); assert.equal(restored.role, "user");
+  assert.equal((await (await f.call("me", undefined, b)).json()).account.displayName, "Synthetic account");
+  assert.doesNotMatch(JSON.stringify(f.sqlite.prepare("SELECT profile_ciphertext FROM accounts").all()), /新的合成称呼/);
+  assert.equal((await f.call("profile", { displayName: " " }, a)).status, 400); assert.equal((await f.call("profile", { displayName: "x".repeat(41) }, a)).status, 400);
+  assert.equal((await f.call("profile", { displayName: "unauthenticated" })).status, 401);
+  assert.equal((await accountRequest(f.request("profile", { displayName: "wrong origin" }, a, "https://evil.example"), f.env, f.deps)).status, 403);
+  f.advance(30 * 86400000 + 1); assert.equal((await f.call("profile", { displayName: "expired" }, a)).status, 401);
+});
 test("deployment gate never sends mail or accepts records without configuration", async () => {
   const f = fixture(); const response = await accountRequest(f.request("send", { email: "a@example.com" }), { ...f.env, ACCOUNT_ENABLED: "false" }, f.deps);
   assert.equal(response.status, 503); assert.equal(f.codes.size, 0);

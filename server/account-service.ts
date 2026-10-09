@@ -2,6 +2,7 @@ import { calculateDeterministicChart } from "../domain/chart/index.ts";
 import { consultationContext, CONSULTATION_INSTRUCTIONS, parseReading, readingText } from "./consultation-context.ts";
 import { translatePlain, translationTitles } from "./plain-translation.ts";
 import type { ConversationMessage, Reading, Translation } from "../lib/consultation.ts";
+import type { AccountProfile, AccountSummary } from "../lib/account.ts";
 
 export interface Statement {
   bind(...values: (string | number | null)[]): Statement;
@@ -101,6 +102,13 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
   async function audit(user: User, action: string, target: string, reason: string | null = null, ticket: string | null = null) {
     return sql("INSERT INTO audit_events(id,actor_account_id,actor_role,action,target_type,target_id,reason_code,ticket_id,request_id,outcome,occurred_at,purge_at) VALUES(?,?,?,?,?,?,?,?,?,'success',?,?)", id(), user.id, user.role, action, "archive", target, reason, ticket, id(), at, new Date(now + 90 * 86400000).toISOString()).run();
   }
+  async function accountProfile(user: User): Promise<AccountProfile> {
+    const row = await sql("SELECT profile_ciphertext,created_at FROM accounts WHERE id=?", user.id).first<{ profile_ciphertext: string | null; created_at: string }>();
+    if (!row) fail(401, "账户不可用，请重新登录");
+    const profile = row.profile_ciphertext ? await unseal(master, JSON.parse(row.profile_ciphertext), `profile:${user.id}`) as { displayName: string } : { displayName: "我的账户" };
+    const number = Array.from(bytes(await hash(`public-account:${user.id}`)).slice(0, 8), x => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+    return { displayName: profile.displayName, number: `SJ-${number}`, createdAt: row.created_at, loginMethod: "email_code" };
+  }
   try {
     if (request.method !== "GET" && request.headers.get("Origin") !== new URL(request.url).origin) fail(403, "请从本站页面提交请求");
     if (loginOnly && !["send", "verify", "me", "logout"].includes(path)) fail(503, "邮箱已接通，档案保存和讨论正在准备。当前不会保存出生资料。");
@@ -160,13 +168,24 @@ export async function accountRequest(request: Request, env: Env, deps: Dependenc
       await sql("DELETE FROM auth_sessions WHERE token_digest=?", await hash(`session:${token}`)).run(); return json({ signedIn: false }, 200, { "Set-Cookie": cookie("", 0) });
     }
     if (path === "me" && request.method === "GET") {
-      const profile = await sql("SELECT profile_ciphertext FROM accounts WHERE id=?", user.id).first<{ profile_ciphertext: string | null }>();
-      const account = profile?.profile_ciphertext ? await unseal(master, JSON.parse(profile.profile_ciphertext), `profile:${user.id}`) : { displayName: "我的账户" };
+      const account = await accountProfile(user);
       if (loginOnly) return json({ signedIn: true, role: user.role, account, snapshot: null, remaining: 3, storageAvailable: false });
       const archive = await loadArchive(user); const snapshot = archive ? await loadSnapshot(user, archive) : null;
       const usage = await sql("SELECT answers FROM account_usage WHERE account_id=?", user.id).first<{ answers: number }>();
       const discussion = archive ? await sql("SELECT id,created_at FROM archive_records WHERE archive_id=? AND owner_account_id=? AND record_type='consultation' ORDER BY rowid DESC LIMIT 1", archive.id, user.id).first<{ id: string; created_at: string }>() : null;
-      return json({ signedIn: true, role: user.role, account, snapshot, latestDiscussion: discussion ? { id: discussion.id, at: discussion.created_at } : null, remaining: Math.max(0, 3 - (usage?.answers ?? 0)), storageAvailable: true });
+      const summary: AccountSummary = await sql("SELECT COUNT(*) AS savedVersions, COALESCE(SUM(CASE WHEN record_type='consultation' THEN 1 ELSE 0 END),0) AS savedQuestions, MAX(created_at) AS lastSavedAt FROM archive_records WHERE owner_account_id=?", user.id).first<AccountSummary>() ?? { savedVersions: 0, savedQuestions: 0, lastSavedAt: null };
+      return json({ signedIn: true, role: user.role, account, summary, snapshot, latestDiscussion: discussion ? { id: discussion.id, at: discussion.created_at } : null, remaining: Math.max(0, 3 - (usage?.answers ?? 0)), storageAvailable: true });
+    }
+    if (path === "profile" && request.method === "POST") {
+      const body = await boundedBody(request); const displayName = string(body.displayName, 40);
+      const token = await lock(user);
+      try {
+        const row = await sql("SELECT profile_ciphertext FROM accounts WHERE id=?", user.id).first<{ profile_ciphertext: string | null }>();
+        const prior = row?.profile_ciphertext ? await unseal(master, JSON.parse(row.profile_ciphertext), `profile:${user.id}`) as Record<string, unknown> : {};
+        const encrypted = JSON.stringify(await seal(master, { ...prior, displayName }, `profile:${user.id}`));
+        await sql("UPDATE accounts SET profile_ciphertext=?,updated_at=? WHERE id=?", encrypted, at, user.id).run();
+        return json({ saved: true, account: await accountProfile(user) });
+      } finally { await unlock(user, token); }
     }
     if (path === "history" && request.method === "GET") {
       const archive = await loadArchive(user); if (!archive) { if (new URL(request.url).searchParams.has("id")) fail(404, "这条历史记录不存在"); return json({ items: [], nextCursor: null }); }
